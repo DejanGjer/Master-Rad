@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, random_split
 import numpy as np
 import time
 from datetime import datetime as dt
@@ -14,9 +14,10 @@ import matplotlib.pyplot as plt
 import os
 
 import config
-from fgsm_attack import FGSMDataset, run_fgsm, test_fgsm
+from fgsm_attack import run_fgsm, test_fgsm
+from pgd_attack import run_pgd
 from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device
-from dataset import cifar10_loader_resnet, transform_train, transform_test, transform_pgd
+from dataset import cifar10_loader_resnet, transform_train, transform_test, transform_pgd, AttackDataset
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
 from resnet18 import ResNet, BasicBlock
@@ -27,23 +28,28 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(42)
 
-def create_fgsm_dataset(fgsm_loader, model, device):
+def create_attack_dataset(attack_type, attack_loader, model, device):
+    assert attack_type == "fgsm" or attack_type == "pgd"
     start_time = time.time()
     # Create detaset from fgsm attacked images
-    print("Creating FGSM dataset...")
-    adv_images, org_images = run_fgsm(model, device, fgsm_loader, config.epsilons)
-    fgsm_train_dataset = FGSMDataset(adv_images, org_images)
+    print(f"Creating {attack_type} dataset...")
+    adv_images, org_images = [], []
+    if attack_type == "fgsm":
+        adv_images, org_images = run_fgsm(model, device, attack_loader, config.epsilons)
+    elif attack_type == "pgd":
+        adv_images, org_images = run_pgd(model, device, attack_loader, config.epsilons, config.pgd_alpha, config.pgd_steps)
+    attack_train_dataset = AttackDataset(adv_images, org_images)
     # split training dataset into training and validation
-    fgsm_train_dataset, fgsm_validation_dataset = torch.utils.data.random_split(fgsm_train_dataset, 
+    attack_train_dataset, attack_validation_dataset = random_split(attack_train_dataset, 
                                                     [config.train_split, config.validation_split])
-    fgsm_train_loader = DataLoader(fgsm_train_dataset, batch_size=config.batch_size, shuffle=True)
-    fgsm_validation_loader = DataLoader(fgsm_validation_dataset, batch_size=config.batch_size, shuffle=False)
+    attack_train_loader = DataLoader(attack_train_dataset, batch_size=config.batch_size, shuffle=True)
+    attack_validation_loader = DataLoader(attack_validation_dataset, batch_size=config.batch_size, shuffle=False)
 
-    print(f"Training fgsm set size: {len(fgsm_train_loader.dataset)}")
-    print(f"Validation fgsm set size: {len(fgsm_validation_loader.dataset)}")
+    print(f"Training {attack_type} set size: {len(attack_train_loader.dataset)}")
+    print(f"Validation {attack_type} set size: {len(attack_validation_loader.dataset)}")
     print('--- Total time: %s seconds ---' % (time.time() - start_time))
 
-    return fgsm_train_loader, fgsm_validation_loader
+    return attack_train_loader, attack_validation_loader
 
 
 if __name__ == "__main__":
@@ -65,13 +71,15 @@ if __name__ == "__main__":
     train_loader = loader(device, config.batch_size, transform_train, train=True)
     test_loader = loader(device, config.batch_size, transform_test)
     fgsm_loader = loader(device, 1, transform_train, train=True)
-    pgd_loader = loader(device, config.batch_size, transform_pgd, train=True)
+    pgd_loader = loader(device, 1, transform_pgd, train=True)
 
     print(f"Training set size: {len(train_loader.dataset)}")
     print(f"Test set size: {len(test_loader.dataset)}")
     print(f"FGSM set size: {len(fgsm_loader.dataset)}")
 
-    fgsm_train_loader, fgsm_validation_loader = create_fgsm_dataset(fgsm_loader, model_normal, device)
+    attack_train_loader, attack_validation_loader = create_attack_dataset(config.attack_type, 
+                                                                          fgsm_loader if config.attack_type == "fgsm" else pgd_loader, 
+                                                                          model_normal, device)
 
     # Train denoising model
 
@@ -89,10 +97,10 @@ if __name__ == "__main__":
     }
     # training loop
     for epoch in range(1, config.epochs + 1):
-        train_losses = train_denoiser(model, fgsm_train_loader, optimizer, config.loss, device, 
+        train_losses = train_denoiser(model, attack_train_loader, optimizer, config.loss, device, 
                                       defended_model=None if config.loss == "pgd" else model_normal)
         print(f"Average training loss (epoch {epoch}): {np.mean(train_losses)}")
-        validation_losses = test_denoiser(model, fgsm_validation_loader, config.loss, device,
+        validation_losses = test_denoiser(model, attack_validation_loader, config.loss, device,
                                           defended_model=None if config.loss == "pgd" else model_normal)
         print(f"Average validation loss (epoch {epoch}): {np.mean(validation_losses)}")
         metrics["train_loss"].append(np.mean(train_losses))
@@ -109,10 +117,10 @@ if __name__ == "__main__":
     model.eval()
     # Run test for each epsilon value
     average_improvement = 0
-    for epsilon in config.epsilons:
-        test_fgsm(model_normal, device, train_loader, epsilon, dataset_type="train")
-        test_fgsm(model_normal, device, train_loader, epsilon, denoiser=model, dataset_type="train")
-        _, _, acc1 = test_fgsm(model_normal, device, test_loader, epsilon, dataset_type="test")
-        _, _, acc2 = test_fgsm(model_normal, device, test_loader, epsilon, denoiser=model, dataset_type="test")
-        average_improvement += acc2 - acc1
-    print(f"Average imprevement: {100 * average_improvement / len(config.epsilons)}%")
+    # for epsilon in config.epsilons:
+    #     test_fgsm(model_normal, device, train_loader, epsilon, dataset_type="train")
+    #     test_fgsm(model_normal, device, train_loader, epsilon, denoiser=model, dataset_type="train")
+    #     _, _, acc1 = test_fgsm(model_normal, device, test_loader, epsilon, dataset_type="test")
+    #     _, _, acc2 = test_fgsm(model_normal, device, test_loader, epsilon, denoiser=model, dataset_type="test")
+    #     average_improvement += acc2 - acc1
+    # print(f"Average imprevement: {100 * average_improvement / len(config.epsilons)}%")

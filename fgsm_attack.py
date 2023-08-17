@@ -1,21 +1,6 @@
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-class FGSMDataset(Dataset):
-    def __init__(self, adv_images, org_images):
-        self.adv_images = adv_images
-        self.org_images = org_images
-
-    def __len__(self):
-        return len(self.adv_images)
-
-    def __getitem__(self, idx):
-        image = self.adv_images[idx]
-        label = self.org_images[idx]
-
-        return image, label
-
-
 # FGSM attack code
 def fgsm_attack(image, epsilon, data_grad):
     # get element-wise signs for gradient ascent
@@ -30,7 +15,6 @@ def run_fgsm(model, device, loader, epsilons):
     assert len(loader) == len(loader.dataset)
     
     model.eval()
-    correct = 0
     adv_images, org_images = [], []
     part_size = len(loader.dataset) // len(epsilons)
     for i, (data, target) in enumerate(loader):
