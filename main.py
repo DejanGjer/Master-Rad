@@ -15,7 +15,7 @@ import os
 
 import config
 from fgsm_attack import run_fgsm, test_fgsm
-from pgd_attack import run_pgd
+from pgd_attack import run_pgd, test_pgd
 from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device
 from dataset import cifar10_loader_resnet, transform_train, transform_test, transform_pgd, AttackDataset
 from denoiser import train_denoiser, test_denoiser
@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
     print(f"Training set size: {len(train_loader.dataset)}")
     print(f"Test set size: {len(test_loader.dataset)}")
-    print(f"FGSM set size: {len(fgsm_loader.dataset)}")
+    print(f"{config.attack_type} set size: {len(fgsm_loader.dataset)}")
 
     attack_train_loader, attack_validation_loader = create_attack_dataset(config.attack_type, 
                                                                           fgsm_loader if config.attack_type == "fgsm" else pgd_loader, 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         metrics["train_loss"].append(np.mean(train_losses))
         metrics["validation_loss"].append(np.mean(validation_losses))
 
-    save_dir = create_save_directories(config.save_root_path)
+    save_dir, pgd_save_dir = create_save_directories(config.save_root_path, config.pgd_save_path)
     save_model(model, os.path.join(save_dir, 'unet_denoiser.pt'))
     plot_loss_history(metrics, save_dir)
     # save configuration file
@@ -117,10 +117,17 @@ if __name__ == "__main__":
     model.eval()
     # Run test for each epsilon value
     average_improvement = 0
-    # for epsilon in config.epsilons:
-    #     test_fgsm(model_normal, device, train_loader, epsilon, dataset_type="train")
-    #     test_fgsm(model_normal, device, train_loader, epsilon, denoiser=model, dataset_type="train")
-    #     _, _, acc1 = test_fgsm(model_normal, device, test_loader, epsilon, dataset_type="test")
-    #     _, _, acc2 = test_fgsm(model_normal, device, test_loader, epsilon, denoiser=model, dataset_type="test")
-    #     average_improvement += acc2 - acc1
-    # print(f"Average imprevement: {100 * average_improvement / len(config.epsilons)}%")
+    for epsilon in config.epsilons:
+        # test_fgsm(model_normal, device, train_loader, epsilon, dataset_type="train")
+        # test_fgsm(model_normal, device, train_loader, epsilon, denoiser=model, dataset_type="train")
+        acc1, acc2 = 0, 0
+        if config.attack_type == "fgsm":
+            _, _, acc1 = test_fgsm(model_normal, device, test_loader, epsilon, dataset_type="test")
+            _, _, acc2 = test_fgsm(model_normal, device, test_loader, epsilon, denoiser=model, dataset_type="test")
+        elif config.attack_type == "pgd":
+            acc1 = test_pgd(model_normal, device, pgd_loader, epsilon, config.pgd_alpha, config.pgd_steps, 
+                                  pgd_save_dir, config.batch_size, denoiser=None, dataset_type="test")
+            acc2 = test_pgd(model_normal, device, pgd_loader, epsilon, config.pgd_alpha, config.pgd_steps,
+                                  pgd_save_dir, config.batch_size, denoiser=model, dataset_type="test")
+        average_improvement += acc2 - acc1
+    print(f"Average imprevement: {100 * average_improvement / len(config.epsilons)}%")

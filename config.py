@@ -16,6 +16,9 @@ bilinear = True
 learn_noise = False
 loss = 'pgd' # type of the loss can be pgd and lgd
 
-# model data
+# load paths
 model_path = './original_models/model_normal.pt'
+
+# saving paths
 save_root_path = './results'
+pgd_save_path = 'pgd_datasets'
