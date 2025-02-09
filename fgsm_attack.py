@@ -1,5 +1,6 @@
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+import pandas as pd
 
 # FGSM attack code
 def fgsm_attack(image, epsilon, data_grad):
@@ -69,10 +70,16 @@ def test_fgsm(model, device, loader, epsilon, save_adversarials=False, denoiser=
                 correct += 1
 
     final_acc = correct / float(len(loader.dataset))
+    # create one row in the results dataframe
+    result = pd.Series({'Model': model.net_type, 
+                        'Epsilon': epsilon, 
+                        'Dataset': dataset_type, 
+                        'Denoised': "Yes" if denoiser else "No", 
+                        'Accuracy': final_acc})
     print(
         "Model: {}\t Epsilon: {}\t Dataset: {}\t Denoised: {}\t Accuracy = {} / {} = {}".format(
             model.net_type, epsilon, dataset_type, "Yes" if denoiser else "No", correct, len(loader.dataset), final_acc
         )
     )
 
-    return adv_images, org_images, final_acc
+    return adv_images, org_images, final_acc, result

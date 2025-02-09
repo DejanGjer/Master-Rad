@@ -4,6 +4,7 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 from tqdm import tqdm
 from torchvision import transforms
 import os
+import pandas as pd
 
 def run_pgd(model, device, loader, epsilons, alpha, steps):
     # loader needs to have batch_size set to 1
@@ -52,11 +53,17 @@ def test_pgd(model, device, loader, epsilon, alpha, steps, dataset_save_path, ba
                 correct += 1
 
     final_acc = correct / float(len(loader.dataset))
+    # create one row in the results dataframe
+    result = pd.Series({'Model': model.net_type, 
+                        'Epsilon': epsilon, 
+                        'Dataset': dataset_type, 
+                        'Denoised': "Yes" if denoiser else "No", 
+                        'Accuracy': final_acc})
     print(
         "Model: {}\t Epsilon: {}\t Dataset: {}\t Denoised: {}\t Accuracy = {} / {} = {}".format(
             model.net_type, epsilon, dataset_type, "Yes" if denoiser else "No", correct, len(loader.dataset), final_acc
         )
     )
 
-    return final_acc
+    return final_acc, result
 

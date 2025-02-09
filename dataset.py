@@ -6,18 +6,20 @@ from torchvision import datasets, transforms
 import random
 
 class AttackDataset(Dataset):
-    def __init__(self, adv_images, org_images):
+    def __init__(self, adv_images, org_images, model_idxs):
         self.adv_images = adv_images
         self.org_images = org_images
+        self.model_idxs = model_idxs
 
     def __len__(self):
         return len(self.adv_images)
 
     def __getitem__(self, idx):
         image = self.adv_images[idx]
+        model_idx = self.model_idxs[idx]
         label = self.org_images[idx]
 
-        return image, label
+        return image, label, model_idx
 
 transform_train = transforms.Compose([
     transforms.RandomCrop(32, padding=4),
