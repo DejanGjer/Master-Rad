@@ -37,21 +37,14 @@ transform_pgd = transforms.Compose([
     transforms.ToTensor()
 ])
 
-def cifar10_loader_resnet(device, batch_size, transform, train=False, split=None):
+def cifar10_loader_resnet(device, batch_size, transform, train=False):
     dataset = datasets.CIFAR10('../data', download=True, train=train,
                           transform=transform)
     # if we are using cpu, take only subset of dataset
     if device == torch.device('cpu'):
-        num_samples = len(dataset) // 1000
+        num_samples = len(dataset) // 50
         random_indices = random.sample(range(len(dataset)), num_samples)
         dataset = Subset(dataset, random_indices)
 
-    # if split is not None:
-    #     split_datasets = random_split(dataset, split)
-    #     dataloaders = []
-    #     for split_dataset in split_datasets:
-    #         dataloaders.append(DataLoader(split_dataset, batch_size=batch_size, shuffle=train))
-    #     return dataloaders
-    
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train)
     return dataloader

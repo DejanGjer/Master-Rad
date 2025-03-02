@@ -1,48 +1,32 @@
 from torchattacks import PGD
-import torch
-from torch.utils.data import Dataset, DataLoader, TensorDataset
 from tqdm import tqdm
-from torchvision import transforms
 import os
 import pandas as pd
 
-def run_pgd(model, device, loader, epsilons, alpha, steps):
-    # loader needs to have batch_size set to 1
-    assert len(loader) == len(loader.dataset)
+def run_pgd(model, loader, epsilons, alpha, steps):
     pgd_attacks = [PGD(model, eps=epsilon, alpha=alpha, steps=steps) for epsilon in epsilons]
     model.eval()
     adv_images, org_images = [], []
-    part_size = len(loader.dataset) // len(epsilons)
-    loader = tqdm(loader, total=len(loader))
+    part_size = len(loader) // len(epsilons)
+    assert part_size > 0, "Too many epsilons for the dataset size"
     print("PGD attack")
-    for i, (data, target) in enumerate(loader):
-        data, target = data.to(device), target.to(device)
-        perturbed_data = pgd_attacks[i // part_size](data, target)
-
-        adv_images.extend([ex for ex in perturbed_data])
-        org_images.extend([ex for ex in data])
+    for i, (data, target) in enumerate(tqdm(loader, total=len(loader))):
+        part = i // part_size if i // part_size < len(epsilons) else i % len(epsilons) 
+        perturbed_data = pgd_attacks[part](data, target)
+        adv_images.extend(perturbed_data)
+        org_images.extend(data)
 
     return adv_images, org_images
 
-def test_pgd(model, device, loader, epsilon, alpha, steps, dataset_save_path, denoiser=None, dataset_type="test"):
+def test_pgd(model, loader, epsilon, alpha, steps, dataset_save_path, denoiser=None, dataset_type="test"):
     pgd_attack = PGD(model, eps=epsilon, alpha=alpha, steps=steps)
     dataset_save_path = os.path.join(dataset_save_path, f"pgd_test_{model.net_type}_{int(epsilon * 100)}.pt")
     pgd_attack.save(data_loader=loader, save_path=dataset_save_path, verbose=False, save_type='int')
-    
-    # adv_dict = torch.load(dataset_save_path)
-    # adv_images = adv_dict['adv_inputs']
-    # adv_labels = adv_dict['labels']
-    
-    # transform_att = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-    # adv_images = transform_att(adv_images.float()/255)     
-    # adv_data = TensorDataset(adv_images, adv_labels)
-    # adv_loader = DataLoader(adv_data, batch_size=batch_size, shuffle=False)
 
     model.eval()
     correct = 0
-
-    for images, labels in loader:
-        images, labels = images.to(device), labels.to(device)
+    print(f"Testing {model.net_type} on {dataset_type} dataset with PGD attack with epsilon = {epsilon}, denoised = {denoiser is not None}")
+    for images, labels in tqdm(loader, total=len(loader)):
         adv_images = pgd_attack(images, labels)
         if denoiser is not None:
             adv_images = denoiser(adv_images)

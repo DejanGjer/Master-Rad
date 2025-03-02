@@ -1,27 +1,18 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 import numpy as np
 import time
-from datetime import datetime as dt
-from torchvision import datasets, transforms
-import copy
-import random
-from tqdm import tqdm
-import matplotlib.pyplot as plt
 import os
 import pandas as pd
 
 import config
-from fgsm_attack import run_fgsm, test_fgsm
-from pgd_attack import run_pgd, test_pgd
 from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device
-from dataset import cifar10_loader_resnet, transform_train, transform_test, transform_pgd, AttackDataset
+from dataset import cifar10_loader_resnet, transform_train, transform_test, AttackDataset
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
-from resnet18 import ResNet, BasicBlock
+
+from attacks import Attack, FGSMAttack, PGDAttack
 
 torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
@@ -29,18 +20,22 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(42)
 
-def create_attack_dataset(attack_type, attack_loader, models, device):
-    assert attack_type == "fgsm" or attack_type == "pgd"
+def create_attack(attack_type) -> Attack:
+    if attack_type == "fgsm":
+        return FGSMAttack("FGSM", config.epsilons)
+    elif attack_type == "pgd":
+        return PGDAttack("PGD", config.epsilons, config.pgd_alpha, config.pgd_steps)
+    else:
+        raise ValueError("Invalid attack type")
+
+def create_attack_dataset(attack, attack_loader, models):
     start_time = time.time()
     # Create detaset from fgsm attacked images
-    print(f"Creating {attack_type} dataset...")
+    print(f"Creating {attack} attacked dataset...")
     adv_images, org_images, model_idxs = [], [], []
     for i, model in enumerate(models):
-        print(f"Running {attack_type} attack on {model.net_type}...")
-        if attack_type == "fgsm":
-            temp_adv_images, temp_org_images = run_fgsm(model, device, attack_loader, config.epsilons)
-        elif attack_type == "pgd":
-            temp_adv_images, temp_org_images = run_pgd(model, device, attack_loader, config.epsilons, config.pgd_alpha, config.pgd_steps)
+        print(f"Running {attack} attack on {model.net_type}...")
+        temp_adv_images, temp_org_images = attack.run_attack(model, attack_loader)
         adv_images.extend(temp_adv_images)
         org_images.extend(temp_org_images)
         model_idxs.extend([i for _ in range(len(temp_adv_images))])
@@ -52,8 +47,8 @@ def create_attack_dataset(attack_type, attack_loader, models, device):
     attack_train_loader = DataLoader(attack_train_dataset, batch_size=config.batch_size, shuffle=True)
     attack_validation_loader = DataLoader(attack_validation_dataset, batch_size=config.batch_size, shuffle=False)
 
-    print(f"Training {attack_type} set size: {len(attack_train_loader.dataset)}")
-    print(f"Validation {attack_type} set size: {len(attack_validation_loader.dataset)}")
+    print(f"Training {attack} attacked dataset size: {len(attack_train_loader.dataset)}")
+    print(f"Validation {attack} attacked dataset size: {len(attack_validation_loader.dataset)}")
     print('--- Total time: %s seconds ---' % (time.time() - start_time))
 
     return attack_train_loader, attack_validation_loader
@@ -79,18 +74,20 @@ if __name__ == "__main__":
         print(f"Loaded model {attacked_models[-1].net_type}")
 
     loader = cifar10_loader_resnet
-    train_loader = loader(device, config.batch_size, transform_train, train=True)
-    test_loader = loader(device, config.batch_size, transform_test)
     fgsm_loader = loader(device, 1, transform_train, train=True)
-    pgd_loader = loader(device, 1, transform_train, train=True)
+    pgd_loader = loader(device, config.batch_size, transform_train, train=True)
+    test_loader = loader(device, config.batch_size, transform_test)
 
-    # print(f"Training set size: {len(train_loader.dataset)}")
-    # print(f"Test set size: {len(test_loader.dataset)}")
-    # print(f"{config.attack_type} set size: {len(fgsm_loader.dataset)}")
-
-    attack_train_loader, attack_validation_loader = create_attack_dataset(config.attack_type, 
-                                                                          fgsm_loader if config.attack_type == "fgsm" else pgd_loader, 
-                                                                          attacked_models, device)
+    print(f"Attack type: {config.attack_type}")
+    attack = create_attack(config.attack_type)
+    attack_train_loader, attack_validation_loader = create_attack_dataset(
+                                                        attack, 
+                                                        fgsm_loader if config.attack_type == "fgsm" else pgd_loader, 
+                                                        attacked_models
+                                                    )
+    print(f"Training set size: {len(attack_train_loader.dataset)}")
+    print(f"Validation set size: {len(attack_validation_loader.dataset)}")
+    print(f"Test set size: {len(test_loader.dataset)}")
 
     # Train denoising model
 
@@ -147,19 +144,10 @@ if __name__ == "__main__":
         for epsilon in config.epsilons:
             acc1, acc2 = 0, 0
             result = None
-            if config.attack_type == "fgsm":
-                _, _, acc1, result = test_fgsm(attacked_model, device, test_loader, epsilon, dataset_type="test")
-                results = pd.concat([results, result.to_frame().T], ignore_index=True)
-                _, _, acc2, result = test_fgsm(attacked_model, device, test_loader, epsilon, denoiser=model, dataset_type="test")
-                results = pd.concat([results, result.to_frame().T], ignore_index=True)
-            elif config.attack_type == "pgd":
-                acc1, result = test_pgd(attacked_model, device, pgd_loader, epsilon, config.pgd_alpha, config.pgd_steps, 
-                                    pgd_save_dir, denoiser=None, dataset_type="test")
-                results = pd.concat([results, result.to_frame().T], ignore_index=True)
-                acc2, result = test_pgd(attacked_model, device, pgd_loader, epsilon, config.pgd_alpha, config.pgd_steps,
-                                    pgd_save_dir, denoiser=model, dataset_type="test")
-                results = pd.concat([results, result.to_frame().T], ignore_index=True)
-                
+            result = attack.test_attack(attacked_model, test_loader, denoiser=None, epsilon=epsilon)
+            results = pd.concat([results, result.to_frame().T], ignore_index=True)
+            result = attack.test_attack(attacked_model, test_loader, denoiser=model, epsilon=epsilon)
+            results = pd.concat([results, result.to_frame().T], ignore_index=True)
             total_model_improvement += acc2 - acc1
 
         total_average_improvement += total_model_improvement / len(config.epsilons)
