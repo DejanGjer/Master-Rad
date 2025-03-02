@@ -82,7 +82,7 @@ if __name__ == "__main__":
     train_loader = loader(device, config.batch_size, transform_train, train=True)
     test_loader = loader(device, config.batch_size, transform_test)
     fgsm_loader = loader(device, 1, transform_train, train=True)
-    pgd_loader = loader(device, 1, transform_pgd, train=True)
+    pgd_loader = loader(device, 1, transform_train, train=True)
 
     # print(f"Training set size: {len(train_loader.dataset)}")
     # print(f"Test set size: {len(test_loader.dataset)}")
@@ -109,10 +109,10 @@ if __name__ == "__main__":
     # training loop
     for epoch in range(1, config.epochs + 1):
         train_losses = train_denoiser(model, attack_train_loader, optimizer, config.loss, device, 
-                                      defended_models=None if config.loss == "pgd" else attacked_models)
+                                      defended_models=attacked_models)
         print(f"Average training loss (epoch {epoch}): {np.mean(train_losses)}")
         validation_losses = test_denoiser(model, attack_validation_loader, config.loss, device,
-                                          defended_models=None if config.loss == "pgd" else attacked_models)
+                                          defended_models=attacked_models)
         print(f"Average validation loss (epoch {epoch}): {np.mean(validation_losses)}")
         metrics["train_loss"].append(np.mean(train_losses))
         metrics["validation_loss"].append(np.mean(validation_losses))
@@ -154,10 +154,10 @@ if __name__ == "__main__":
                 results = pd.concat([results, result.to_frame().T], ignore_index=True)
             elif config.attack_type == "pgd":
                 acc1, result = test_pgd(attacked_model, device, pgd_loader, epsilon, config.pgd_alpha, config.pgd_steps, 
-                                    pgd_save_dir, config.batch_size, denoiser=None, dataset_type="test")
+                                    pgd_save_dir, denoiser=None, dataset_type="test")
                 results = pd.concat([results, result.to_frame().T], ignore_index=True)
                 acc2, result = test_pgd(attacked_model, device, pgd_loader, epsilon, config.pgd_alpha, config.pgd_steps,
-                                    pgd_save_dir, config.batch_size, denoiser=model, dataset_type="test")
+                                    pgd_save_dir, denoiser=model, dataset_type="test")
                 results = pd.concat([results, result.to_frame().T], ignore_index=True)
                 
             total_model_improvement += acc2 - acc1
