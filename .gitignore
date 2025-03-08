@@ -60,3 +60,8 @@ env_gpu/
 
 # Ignore pycache directories
 __pycache__/
+
+# Ignore model weights
+original_models/
+*.pt
+*.h5

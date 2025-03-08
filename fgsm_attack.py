@@ -1,5 +1,4 @@
 import torch.nn.functional as F
-from torch.utils.data import Dataset
 import pandas as pd
 
 # FGSM attack code
