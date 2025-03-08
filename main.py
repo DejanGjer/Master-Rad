@@ -7,6 +7,7 @@ import os
 import pandas as pd
 
 import config
+from resnet18 import ResNet, BasicBlock
 from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device
 from dataset import cifar10_loader_resnet, transform_train, transform_test, AttackDataset
 from denoiser import train_denoiser, test_denoiser
@@ -142,13 +143,12 @@ if __name__ == "__main__":
     for attacked_model in test_models:
         total_model_improvement = 0
         for epsilon in config.epsilons:
-            acc1, acc2 = 0, 0
             result = None
-            result = attack.test_attack(attacked_model, test_loader, denoiser=None, epsilon=epsilon)
-            results = pd.concat([results, result.to_frame().T], ignore_index=True)
-            result = attack.test_attack(attacked_model, test_loader, denoiser=model, epsilon=epsilon)
-            results = pd.concat([results, result.to_frame().T], ignore_index=True)
-            total_model_improvement += acc2 - acc1
+            result1 = attack.test_attack(attacked_model, test_loader, epsilon=epsilon)
+            results = pd.concat([results, result1.to_frame().T], ignore_index=True)
+            result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, epsilon=epsilon)
+            results = pd.concat([results, result2.to_frame().T], ignore_index=True)
+            total_model_improvement += result2["Accuracy"] - result1["Accuracy"]
 
         total_average_improvement += total_model_improvement / len(config.epsilons)
         averaged_results = pd.concat([averaged_results, 

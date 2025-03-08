@@ -3,7 +3,7 @@ train_split = 0.8
 validation_split = 0.2 # test set is loaded separately  
 
 # attack parameters
-attack_type = 'pgd' # type of the attack can be fgsm and pgd
+attack_type = 'fgsm' # type of the attack can be fgsm and pgd
 epsilons = [0.01, 0.02, 0.03, 0.04, 0.05]
 pgd_alpha = 2/255
 pgd_steps = 40
