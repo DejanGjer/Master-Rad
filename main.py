@@ -4,6 +4,8 @@ from torch.utils.data import DataLoader, random_split
 import numpy as np
 import time
 import os
+import shutil
+
 import pandas as pd
 
 import config
@@ -75,17 +77,14 @@ if __name__ == "__main__":
         print(f"Loaded model {attacked_models[-1].net_type}")
 
     loader = cifar10_loader_resnet
-    fgsm_loader = loader(device, 1, transform_train, train=True)
-    pgd_loader = loader(device, config.batch_size, transform_train, train=True)
+    attack_loader = loader(device, config.batch_size, transform_train, train=True)
     test_loader = loader(device, config.batch_size, transform_test)
 
     print(f"Attack type: {config.attack_type}")
     attack = create_attack(config.attack_type)
     attack_train_loader, attack_validation_loader = create_attack_dataset(
-                                                        attack, 
-                                                        fgsm_loader if config.attack_type == "fgsm" else pgd_loader, 
-                                                        attacked_models
-                                                    )
+        attack, attack_loader, attacked_models
+)
     print(f"Training set size: {len(attack_train_loader.dataset)}")
     print(f"Validation set size: {len(attack_validation_loader.dataset)}")
     print(f"Test set size: {len(test_loader.dataset)}")
@@ -122,9 +121,8 @@ if __name__ == "__main__":
     metrics = pd.DataFrame(metrics)
     metrics.to_csv(os.path.join(save_dir, 'losses.csv'), index=False)
     # save configuration file
-    with open(os.path.join(save_dir, 'config.txt'), 'w') as f:
-        f.write(str(config.__dict__))
-    # load unet model
+    config_save_path = os.path.join(save_dir, 'config.py')
+    shutil.copyfile('config.py', config_save_path)
 
     # Loading models needed for testing
     test_models = []
