@@ -5,6 +5,9 @@ from torch.utils.data import DataLoader, Subset, Dataset
 from torchvision import datasets, transforms
 import random
 
+CIFAR10_MEAN = [0.4914, 0.4822, 0.4465]
+CIFAR10_STD = [0.2023, 0.1994, 0.2010]
+
 class AttackDataset(Dataset):
     def __init__(self, adv_images, org_images, model_idxs):
         self.adv_images = adv_images
@@ -25,12 +28,12 @@ transform_train = transforms.Compose([
     transforms.RandomCrop(32, padding=4),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
 
 transform_test = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
 
 transform_pgd = transforms.Compose([

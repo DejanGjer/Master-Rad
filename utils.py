@@ -1,7 +1,16 @@
 from datetime import datetime as dt
+from typing import List
+
 import matplotlib.pyplot as plt
 import torch
 import os
+
+def normalize_images(images: torch.Tensor, mean: List[float], std: List[float]) -> torch.Tensor:
+    assert torch.max(images) <= 1.0 and torch.min(images) >= 0.0, "Images are not in range [0, 1]"
+    device = images.device
+    mean = torch.tensor(mean).view(1, 3, 1, 1).to(device)
+    std = torch.tensor(std).view(1, 3, 1, 1).to(device)
+    return (images - mean) / std
 
 def load_model(path, device):
     model = None

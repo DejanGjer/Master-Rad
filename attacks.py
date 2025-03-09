@@ -6,9 +6,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torchattacks import PGD
+from torchattacks import PGD, FGSM
 from tqdm import tqdm
 import pandas as pd
+
+from dataset import CIFAR10_MEAN, CIFAR10_STD
+from utils import normalize_images
 
 class Attack(ABC):
     def __init__(self, name: str):
@@ -32,74 +35,41 @@ class FGSMAttack(Attack):
         super().__init__(name)
         self.epsilons = epsilons
 
-    # FGSM attack code
-    def fgsm_attack(self, image, epsilon, data_grad):
-        # get element-wise signs for gradient ascent
-        sign_data_grad = data_grad.sign()
-        perturbed_image = image + epsilon * sign_data_grad
-        # clip to [0,1]
-        # perturbed_image = torch.clamp(perturbed_image, 0, 1)
-        return perturbed_image
-
     def run_attack(self, model, dataloader):
-        # loader needs to have batch_size set to 1
-        assert len(dataloader) == len(dataloader.dataset)
-        device = next(model.parameters()).device
-        
+        fgsm_attacks = [FGSM(model, eps=epsilon) for epsilon in self.epsilons]
         model.eval()
         adv_images, org_images = [], []
-        part_size = len(dataloader.dataset) // len(self.epsilons)
-        for i, (data, target) in enumerate(dataloader):
-            epsilon = self.epsilons[i // part_size]
-            data, target = data.to(device), target.to(device)
-            data.requires_grad = True
-            output = model(data)
-
-            loss = F.nll_loss(output, target)
-            model.zero_grad()
-            loss.backward()
-            data_grad = data.grad.data
-            perturbed_data = self.fgsm_attack(data, epsilon, data_grad)
-
-            adv_images.extend([ex for ex in perturbed_data])
-            org_images.extend([ex for ex in data])
+        part_size = len(dataloader) // len(self.epsilons)
+        assert part_size > 0, "Too many epsilons for the dataset size"
+        for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
+            part = i // part_size if i // part_size < len(self.epsilons) else i % len(self.epsilons)
+            perturbed_data = fgsm_attacks[part](data, target)
+            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            adv_images.extend(perturbed_data)
+            org_images.extend(data)
 
         return adv_images, org_images
     
     def test_attack(self, model, dataloader, denoiser_model=None, epsilon=0.01):
+        fgsm_attack = FGSM(model, eps=epsilon)
         model.eval()
-        device = next(model.parameters()).device
         correct = 0
-        for data, target in dataloader:
-            data, target = data.to(device), target.to(device)
-            data.requires_grad = True
-            output = model(data)
-
-            loss = F.nll_loss(output, target)
-            model.zero_grad()
-            loss.backward()
-            data_grad = data.grad.data
-            perturbed_data = self.fgsm_attack(data, epsilon, data_grad)
-
-            init_pred = output.max(1, keepdim=False)[1]
-            # If the initial prediction is wrong
-            # dont bother attacking, just move on
-            for init, targ in zip(init_pred, target):
-                if init.item() != targ.item():
-                    continue
-            # if we use denoiser, denoise the perturbed image first
+        print(f"Testing {model.net_type} with FGSM attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
+        for images, labels in tqdm(dataloader, total=len(dataloader)):
+            adv_images = fgsm_attack(images, labels)
+            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
             if denoiser_model is not None:
-                perturbed_data = denoiser_model(perturbed_data)
-            output = model(perturbed_data)
-            final_pred = output.max(1, keepdim=False)[1]
-            for final, targ in zip(final_pred, target):
+                adv_images = denoiser_model(adv_images)
+            outputs = model(adv_images)
+            final_preds = outputs.max(1, keepdim=False)[1]
+            for final, targ in zip(final_preds, labels):
                 if final.item() == targ.item():
                     correct += 1
-
         final_acc = correct / float(len(dataloader.dataset))
         # create one row in the results dataframe
         result = pd.Series({'Model': model.net_type, 
-                            'Epsilon': epsilon, 
+                            'Epsilon': epsilon,  
                             'Denoised': "Yes" if denoiser_model else "No", 
                             'Accuracy': final_acc})
         print(
@@ -126,6 +96,8 @@ class PGDAttack(Attack):
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
             part = i // part_size if i // part_size < len(self.epsilons) else i % len(self.epsilons) 
             perturbed_data = pgd_attacks[part](data, target)
+            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
             adv_images.extend(perturbed_data)
             org_images.extend(data)
         return adv_images, org_images
@@ -139,6 +111,7 @@ class PGDAttack(Attack):
         print(f"Testing {model.net_type} with PGD attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = pgd_attack(images, labels)
+            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
