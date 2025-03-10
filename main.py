@@ -15,7 +15,7 @@ from dataset import cifar10_loader_resnet, transform_train, transform_test, Atta
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
 
-from attacks import Attack, FGSMAttack, PGDAttack
+from attacks import Attack, FGSMAttack, PGDAttack, OnePixelAttack
 
 torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
@@ -23,11 +23,13 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(42)
 
-def create_attack(attack_type) -> Attack:
+def create_attack(attack_type, attack_params) -> Attack:
     if attack_type == "fgsm":
-        return FGSMAttack("FGSM", config.epsilons)
+        return FGSMAttack("FGSM", **attack_params["fgsm"])
     elif attack_type == "pgd":
-        return PGDAttack("PGD", config.epsilons, config.pgd_alpha, config.pgd_steps)
+        return PGDAttack("PGD", **attack_params["pgd"])
+    elif attack_type == "one_pixel":
+        return OnePixelAttack("OnePixel", **attack_params["one_pixel"])
     else:
         raise ValueError("Invalid attack type")
 
@@ -81,7 +83,7 @@ if __name__ == "__main__":
     test_loader = loader(device, config.batch_size, transform_test)
 
     print(f"Attack type: {config.attack_type}")
-    attack = create_attack(config.attack_type)
+    attack = create_attack(config.attack_type, config.attack_params)
     attack_train_loader, attack_validation_loader = create_attack_dataset(
         attack, attack_loader, attacked_models
 )
@@ -140,7 +142,7 @@ if __name__ == "__main__":
 
     for attacked_model in test_models:
         total_model_improvement = 0
-        for epsilon in config.epsilons:
+        for epsilon in config.attack_params["fgsm"]["epsilons"]:
             result = None
             result1 = attack.test_attack(attacked_model, test_loader, epsilon=epsilon)
             results = pd.concat([results, result1.to_frame().T], ignore_index=True)
