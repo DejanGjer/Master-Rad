@@ -15,7 +15,7 @@ from dataset import cifar10_loader_resnet, transform_train, transform_test, Atta
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
 
-from attacks import Attack, FGSMAttack, PGDAttack
+from attacks import Attack, FGSMAttack, PGDAttack, OnePixelAttack, PixleAttack
 
 torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
@@ -23,11 +23,15 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(42)
 
-def create_attack(attack_type) -> Attack:
+def create_attack(attack_type, attack_params) -> Attack:
     if attack_type == "fgsm":
-        return FGSMAttack("FGSM", config.epsilons)
+        return FGSMAttack("FGSM", **attack_params["fgsm"])
     elif attack_type == "pgd":
-        return PGDAttack("PGD", config.epsilons, config.pgd_alpha, config.pgd_steps)
+        return PGDAttack("PGD", **attack_params["pgd"])
+    elif attack_type == "one_pixel":
+        return OnePixelAttack("OnePixel", **attack_params["one_pixel"])
+    elif attack_type == "pixle":
+        return PixleAttack("Pixle", **attack_params["pixle"])
     else:
         raise ValueError("Invalid attack type")
 
@@ -81,7 +85,7 @@ if __name__ == "__main__":
     test_loader = loader(device, config.batch_size, transform_test)
 
     print(f"Attack type: {config.attack_type}")
-    attack = create_attack(config.attack_type)
+    attack = create_attack(config.attack_type, config.attack_params)
     attack_train_loader, attack_validation_loader = create_attack_dataset(
         attack, attack_loader, attacked_models
 )
@@ -135,25 +139,25 @@ if __name__ == "__main__":
     # Run test for each epsilon value
     total_average_improvement = 0
     # pandas dataframe to save all detailed results
-    results = pd.DataFrame(columns=['Model', 'Epsilon', 'Dataset', 'Denoised', 'Accuracy'])
-    averaged_results = pd.DataFrame(columns=['Model', 'Average Improvement'])
+    results = None
+    averaged_results = None
 
     for attacked_model in test_models:
         total_model_improvement = 0
-        for epsilon in config.epsilons:
+        for attack_params in attack:
             result = None
-            result1 = attack.test_attack(attacked_model, test_loader, epsilon=epsilon)
-            results = pd.concat([results, result1.to_frame().T], ignore_index=True)
-            result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, epsilon=epsilon)
-            results = pd.concat([results, result2.to_frame().T], ignore_index=True)
-            total_model_improvement += result2["Accuracy"] - result1["Accuracy"]
+            result1 = attack.test_attack(attacked_model, test_loader, **attack_params)
+            results = pd.concat([results, result1], ignore_index=True) if results is not None else result1
+            result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, **attack_params)
+            results = pd.concat([results, result2], ignore_index=True)
+            total_model_improvement += (result2["Accuracy"] - result1["Accuracy"]).iloc[0]
 
-        total_average_improvement += total_model_improvement / len(config.epsilons)
-        averaged_results = pd.concat([averaged_results, 
-                                      pd.Series({'Model': attacked_model.net_type, 
-                                      'Average Improvement': total_model_improvement / len(config.epsilons)}).to_frame().T], 
-                                      ignore_index=True)
-        print(f"Average improvement for {attacked_model.net_type}: {100 * total_model_improvement / len(config.epsilons)}%")
+        total_average_improvement += total_model_improvement / len(attack)
+        averaged_results_temp = pd.DataFrame({'Model': [attacked_model.net_type], 
+                                      'Average Improvement': [total_model_improvement / len(attack)]})
+        averaged_results = pd.concat([averaged_results, averaged_results_temp], ignore_index=True) \
+                           if averaged_results is not None else averaged_results_temp
+        print(f"Average improvement for {attacked_model.net_type}: {100 * total_model_improvement / len(attack)}%")
     print(f"Average improvement for all models: {100 * total_average_improvement / (len(test_models))}%")
     # save results dataframes
     results.to_csv(os.path.join(save_dir, 'results.csv'), index=False)
