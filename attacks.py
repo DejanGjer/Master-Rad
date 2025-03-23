@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torchattacks import PGD, FGSM, OnePixel
+from torchattacks import PGD, FGSM, OnePixel, Pixle
 from tqdm import tqdm
 import pandas as pd
 from tabulate import tabulate
@@ -55,9 +55,13 @@ class Attack(ABC):
             for name, value in inspect.getmembers(self)
             if isinstance(value, list)
         }
-        # Yield all combinations of list fields
-        for combination in itertools.product(*list_fields.values()):
-            yield dict(zip(list_fields.keys(), combination))
+        if not list_fields:
+            # If tehre are no list fields, return iterartor with one dummy element
+            yield {}
+        else:
+            # Yield all combinations of list fields
+            for combination in itertools.product(*list_fields.values()):
+                yield dict(zip(list_fields.keys(), combination))
 
     def __len__(self):
         # Find all class attributes that are lists
@@ -67,7 +71,7 @@ class Attack(ABC):
             if isinstance(value, list)
         }
         # Return the product of the lengths of all list fields
-        return math.prod(len(v) for v in list_fields.values()) if list_fields else 0
+        return math.prod(len(v) for v in list_fields.values()) if list_fields else 1
 
     def __str__(self) -> str:
         return self.name
@@ -197,3 +201,46 @@ class OnePixelAttack(Attack):
                 if final.item() == targ.item():
                     correct += 1
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, pixel_count=pixel_count)
+    
+class PixleAttack(Attack):
+    def __init__(self, name, x_dimensions, y_dimensions, pixel_mapping, restarts, max_iterations, update_each_iteration):
+        super().__init__(name)
+        self.x_dimensions = x_dimensions
+        self.y_dimensions = y_dimensions
+        self.pixel_mapping = pixel_mapping
+        self.restarts = restarts
+        self.max_iterations = max_iterations
+        self.update_each_iteration = update_each_iteration
+
+    def run_attack(self, model, dataloader):
+        pixle_attacks = [Pixle(model, x_dimensions=self.x_dimensions, y_dimensions=self.y_dimensions, 
+                               pixel_mapping=self.pixel_mapping, restarts=self.restarts, max_iterations=self.max_iterations, 
+                               update_each_iteration=self.update_each_iteration)]
+        model.eval()
+        adv_images, org_images = [], []
+        for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
+            perturbed_data = pixle_attacks[0](data, target)
+            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            adv_images.extend(perturbed_data)
+            org_images.extend(data)
+        return adv_images, org_images
+    
+    def test_attack(self, model, dataloader, denoiser_model=None):
+        pixle_attack = Pixle(model, x_dimensions=self.x_dimensions, y_dimensions=self.y_dimensions, 
+                             pixel_mapping=self.pixel_mapping, restarts=self.restarts, max_iterations=self.max_iterations, 
+                             update_each_iteration=self.update_each_iteration)
+        model.eval()
+        correct = 0
+        print(f"Testing {model.net_type} with Pixle attack, denoised = {denoiser_model is not None}")
+        for images, labels in tqdm(dataloader, total=len(dataloader)):
+            adv_images = pixle_attack(images, labels)
+            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            if denoiser_model is not None:
+                adv_images = denoiser_model(adv_images)
+            outputs = model(adv_images)
+            final_preds = outputs.max(1, keepdim=False)[1]
+            for final, targ in zip(final_preds, labels):
+                if final.item() == targ.item():
+                    correct += 1
+        return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model)

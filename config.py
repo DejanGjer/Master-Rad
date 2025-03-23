@@ -3,7 +3,7 @@ train_split = 0.8
 validation_split = 0.2 # test set is loaded separately  
 
 # attack parameters
-attack_type = 'one_pixel'
+attack_type = 'fgsm'
 attack_params = {
     "fgsm": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05]
@@ -18,13 +18,21 @@ attack_params = {
         "steps": 10,
         "popsize": 10,
         "batch_size": 128
+    },
+    "pixle": {
+        "x_dimensions": (2,10),
+        "y_dimensions": (2,10),
+        "pixel_mapping": "random",
+        "restarts": 20,
+        "max_iterations": 10,
+        "update_each_iteration": False
     }
 }
 
 # hyperparameters
 learning_rate = 0.001
 batch_size = 128
-epochs = 1
+epochs = 15
 bilinear = True
 learn_noise = True
 loss = 'lgd' # type of the loss can be pgd and lgd

@@ -15,7 +15,7 @@ from dataset import cifar10_loader_resnet, transform_train, transform_test, Atta
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
 
-from attacks import Attack, FGSMAttack, PGDAttack, OnePixelAttack
+from attacks import Attack, FGSMAttack, PGDAttack, OnePixelAttack, PixleAttack
 
 torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
@@ -30,6 +30,8 @@ def create_attack(attack_type, attack_params) -> Attack:
         return PGDAttack("PGD", **attack_params["pgd"])
     elif attack_type == "one_pixel":
         return OnePixelAttack("OnePixel", **attack_params["one_pixel"])
+    elif attack_type == "pixle":
+        return PixleAttack("Pixle", **attack_params["pixle"])
     else:
         raise ValueError("Invalid attack type")
 
@@ -138,7 +140,7 @@ if __name__ == "__main__":
     total_average_improvement = 0
     # pandas dataframe to save all detailed results
     results = None
-    averaged_results = pd.DataFrame(columns=['Model', 'Average Improvement'])
+    averaged_results = None
 
     for attacked_model in test_models:
         total_model_improvement = 0
@@ -151,10 +153,10 @@ if __name__ == "__main__":
             total_model_improvement += (result2["Accuracy"] - result1["Accuracy"]).iloc[0]
 
         total_average_improvement += total_model_improvement / len(attack)
-        averaged_results = pd.concat([averaged_results,
-                                      pd.DataFrame({'Model': [attacked_model.net_type], 
-                                      'Average Improvement': [total_model_improvement / len(attack)]})], 
-                                      ignore_index=True)
+        averaged_results_temp = pd.DataFrame({'Model': [attacked_model.net_type], 
+                                      'Average Improvement': [total_model_improvement / len(attack)]})
+        averaged_results = pd.concat([averaged_results, averaged_results_temp], ignore_index=True) \
+                           if averaged_results is not None else averaged_results_temp
         print(f"Average improvement for {attacked_model.net_type}: {100 * total_model_improvement / len(attack)}%")
     print(f"Average improvement for all models: {100 * total_average_improvement / (len(test_models))}%")
     # save results dataframes
