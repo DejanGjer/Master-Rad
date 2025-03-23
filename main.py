@@ -137,25 +137,25 @@ if __name__ == "__main__":
     # Run test for each epsilon value
     total_average_improvement = 0
     # pandas dataframe to save all detailed results
-    results = pd.DataFrame(columns=['Model', 'Epsilon', 'Dataset', 'Denoised', 'Accuracy'])
+    results = None
     averaged_results = pd.DataFrame(columns=['Model', 'Average Improvement'])
 
     for attacked_model in test_models:
         total_model_improvement = 0
-        for epsilon in config.attack_params["fgsm"]["epsilons"]:
+        for attack_params in attack:
             result = None
-            result1 = attack.test_attack(attacked_model, test_loader, epsilon=epsilon)
-            results = pd.concat([results, result1.to_frame().T], ignore_index=True)
-            result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, epsilon=epsilon)
-            results = pd.concat([results, result2.to_frame().T], ignore_index=True)
-            total_model_improvement += result2["Accuracy"] - result1["Accuracy"]
+            result1 = attack.test_attack(attacked_model, test_loader, **attack_params)
+            results = pd.concat([results, result1], ignore_index=True) if results is not None else result1
+            result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, **attack_params)
+            results = pd.concat([results, result2], ignore_index=True)
+            total_model_improvement += (result2["Accuracy"] - result1["Accuracy"]).iloc[0]
 
-        total_average_improvement += total_model_improvement / len(config.epsilons)
-        averaged_results = pd.concat([averaged_results, 
-                                      pd.Series({'Model': attacked_model.net_type, 
-                                      'Average Improvement': total_model_improvement / len(config.epsilons)}).to_frame().T], 
+        total_average_improvement += total_model_improvement / len(attack)
+        averaged_results = pd.concat([averaged_results,
+                                      pd.DataFrame({'Model': [attacked_model.net_type], 
+                                      'Average Improvement': [total_model_improvement / len(attack)]})], 
                                       ignore_index=True)
-        print(f"Average improvement for {attacked_model.net_type}: {100 * total_model_improvement / len(config.epsilons)}%")
+        print(f"Average improvement for {attacked_model.net_type}: {100 * total_model_improvement / len(attack)}%")
     print(f"Average improvement for all models: {100 * total_average_improvement / (len(test_models))}%")
     # save results dataframes
     results.to_csv(os.path.join(save_dir, 'results.csv'), index=False)

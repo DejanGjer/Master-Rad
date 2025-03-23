@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Dict
-import os
+from typing import List, Tuple
+import inspect
+import itertools
 
 import torch
 import torch.nn as nn
@@ -10,6 +11,7 @@ from torchattacks import PGD, FGSM, OnePixel
 from tqdm import tqdm
 import pandas as pd
 from tabulate import tabulate
+import math
 
 from dataset import CIFAR10_MEAN, CIFAR10_STD
 from utils import normalize_images
@@ -36,7 +38,7 @@ class Attack(ABC):
             'Model': [model.net_type], 
             'Denoised': ["Yes"] if denoiser_model else ["No"]
         })
-        result = pd.concat([result, pd.DataFrame(kwargs)], axis=1)
+        result = pd.concat([result, pd.DataFrame(kwargs, index=[0])], axis=1)
         metrics = pd.DataFrame({
             'Correct': [correct],
             'Total': [len(dataloader.dataset)],
@@ -44,10 +46,28 @@ class Attack(ABC):
         })
         result = pd.concat([result, metrics], axis=1)
         print(result)
-        # print the results
-        table = [result.index.tolist(), result.values.tolist()]
-        print(tabulate(table, headers="firstrow", tablefmt="grid"))
         return result
+    
+    def __iter__(self):
+        # Find all class attributes that are lists
+        list_fields = {
+            name: value
+            for name, value in inspect.getmembers(self)
+            if isinstance(value, list)
+        }
+        # Yield all combinations of list fields
+        for combination in itertools.product(*list_fields.values()):
+            yield dict(zip(list_fields.keys(), combination))
+
+    def __len__(self):
+        # Find all class attributes that are lists
+        list_fields = {
+            name: value
+            for name, value in inspect.getmembers(self)
+            if isinstance(value, list)
+        }
+        # Return the product of the lengths of all list fields
+        return math.prod(len(v) for v in list_fields.values()) if list_fields else 0
 
     def __str__(self) -> str:
         return self.name
@@ -73,7 +93,9 @@ class FGSMAttack(Attack):
 
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None, epsilon=0.01):
+    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01):
+        # rename the epsilons argument (which has to have same name as the class attribute) to epsilon
+        epsilon=epsilons
         fgsm_attack = FGSM(model, eps=epsilon)
         model.eval()
         correct = 0
@@ -113,7 +135,9 @@ class PGDAttack(Attack):
             org_images.extend(data)
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None, epsilon=0.01):
+    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01):
+        # rename the epsilons argument (which has to have same name as the class attribute) to epsilon
+        epsilon=epsilons
         pgd_attack = PGD(model, eps=epsilon, alpha=self.alpha, steps=self.steps)
         # dataset_save_path = os.path.join(dataset_save_path, f"pgd_test_{model.net_type}_{int(epsilon * 100)}.pt")
         # pgd_attack.save(data_loader=dataloader, save_path=dataset_save_path, verbose=False, save_type='int')
@@ -135,19 +159,19 @@ class PGDAttack(Attack):
 class OnePixelAttack(Attack):
     def __init__(self, name, pixel_counts, steps, popsize, batch_size):
         super().__init__(name)
-        self.pixel_count = pixel_counts
+        self.pixel_counts = pixel_counts
         self.steps = steps
         self.popsize = popsize
         self.batch_size = batch_size
 
     def run_attack(self, model, dataloader):
-        one_pixel_attacks = [OnePixel(model, pixel_count=pc, steps=self.steps, popsize=self.popsize, inf_batch=self.batch_size) for pc in self.pixel_count]
+        one_pixel_attacks = [OnePixel(model, pixels=pc, steps=self.steps, popsize=self.popsize, inf_batch=self.batch_size) for pc in self.pixel_counts]
         model.eval()
         adv_images, org_images = [], []
-        part_size = len(dataloader) // len(self.pixel_count)
+        part_size = len(dataloader) // len(self.pixel_counts)
         assert part_size > 0, "Too many pixel counts for the dataset size"
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
-            part = i // part_size if i // part_size < len(self.pixel_count) else i % len(self.pixel_count)
+            part = i // part_size if i // part_size < len(self.pixel_counts) else i % len(self.pixel_counts)
             perturbed_data = one_pixel_attacks[part](data, target)
             perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
             data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
@@ -155,8 +179,10 @@ class OnePixelAttack(Attack):
             org_images.extend(data)
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None, pixel_count=1):
-        one_pixel_attack = OnePixel(model, pixel_count=pixel_count, steps=self.steps, popsize=self.popsize, inf_batch=self.batch_size)
+    def test_attack(self, model, dataloader, denoiser_model=None, pixel_counts=1):
+        # rename the pixel_counts argument (which has to have same name as the class attribute) to pixel_count
+        pixel_count = pixel_counts
+        one_pixel_attack = OnePixel(model, pixels=pixel_count, steps=self.steps, popsize=self.popsize, inf_batch=self.batch_size)
         model.eval()
         correct = 0
         print(f"Testing {model.net_type} with OnePixel attack with pixel count = {pixel_count}, denoised = {denoiser_model is not None}")

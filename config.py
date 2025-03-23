@@ -3,7 +3,7 @@ train_split = 0.8
 validation_split = 0.2 # test set is loaded separately  
 
 # attack parameters
-attack_type = 'fgsm'
+attack_type = 'one_pixel'
 attack_params = {
     "fgsm": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05]
@@ -16,7 +16,8 @@ attack_params = {
     "one_pixel": {
         "pixel_counts": [1],
         "steps": 10,
-        "popsize": 10
+        "popsize": 10,
+        "batch_size": 128
     }
 }
 
