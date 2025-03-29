@@ -8,10 +8,22 @@ attack_params = {
     "fgsm": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05]
     },
+    "rfgsm": {
+        "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
+        "alpha": 2/255,
+        "steps": 40
+    },
     "pgd": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
         "alpha": 2/255,
         "steps": 40
+    },
+    "auto_attack": {
+        "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
+        "norm": "Linf", # Linf or L2
+        "version": "standard", # standard, plus or rand
+        "n_classes": 10,
+        "seed": 42
     },
     "one_pixel": {
         "pixel_counts": [1],
