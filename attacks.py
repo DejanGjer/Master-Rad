@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torchattacks import PGD, FGSM, RFGSM, OnePixel, Pixle, AutoAttack
+from torchattacks import PGD, FGSM, RFGSM, OnePixel, Pixle
 from tqdm import tqdm
 import pandas as pd
 from tabulate import tabulate
@@ -199,49 +199,6 @@ class PGDAttack(Attack):
                     correct += 1
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
     
-class AutoAttackAttack(Attack):
-    def __init__(self, epsilons, norm, version, n_classes, seed):
-        super().__init__("AutoAttack")
-        self.epsilons = epsilons
-        self.norm = norm
-        self.version = version
-        self.n_classes = n_classes
-        self.seed = seed
-
-    def run_attack(self, model, dataloader):
-        auto_attacks = [AutoAttack(model, eps=epsilon, norm=self.norm, version=self.version, n_classes=self.n_classes, seed=self.seed) for epsilon in self.epsilons]
-        model.eval()
-        adv_images, org_images = [], []
-        part_size = len(dataloader) // len(self.epsilons)
-        assert part_size > 0, "Too many epsilons for the dataset size"
-        for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
-            part = i // part_size if i // part_size < len(self.epsilons) else i % len(self.epsilons)
-            perturbed_data = auto_attacks[part](data, target)
-            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            adv_images.extend(perturbed_data)
-            org_images.extend(data)
-        return adv_images, org_images
-    
-    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01):
-        # rename the epsilons argument (which has to have same name as the class attribute) to epsilon
-        epsilon=epsilons
-        auto_attack = AutoAttack(model, eps=epsilon, norm=self.norm, version=self.version, n_classes=self.n_classes, seed=self.seed)
-        model.eval()
-        correct = 0
-        print(f"Testing {model.net_type} with AutoAttack attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
-        for images, labels in tqdm(dataloader, total=len(dataloader)):
-            adv_images = auto_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            if denoiser_model is not None:
-                adv_images = denoiser_model(adv_images)
-            outputs = model(adv_images)
-            final_preds = outputs.max(1, keepdim=False)[1]
-            for final, targ in zip(final_preds, labels):
-                if final.item() == targ.item():
-                    correct += 1
-        return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
-
 class OnePixelAttack(Attack):
     def __init__(self, name, pixel_counts, steps, popsize, batch_size):
         super().__init__(name)

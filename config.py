@@ -18,13 +18,6 @@ attack_params = {
         "alpha": 2/255,
         "steps": 40
     },
-    "auto_attack": {
-        "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
-        "norm": "Linf", # Linf or L2
-        "version": "standard", # standard, plus or rand
-        "n_classes": 10,
-        "seed": 42
-    },
     "one_pixel": {
         "pixel_counts": [1],
         "steps": 10,
@@ -44,7 +37,7 @@ attack_params = {
 # hyperparameters
 learning_rate = 0.001
 batch_size = 128
-epochs = 15
+epochs = 1
 bilinear = True
 learn_noise = True
 loss = 'lgd' # type of the loss can be pgd and lgd
