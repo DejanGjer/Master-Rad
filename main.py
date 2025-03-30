@@ -15,7 +15,7 @@ from dataset import cifar10_loader_resnet, transform_train, transform_test, Atta
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
 
-from attacks import Attack, FGSMAttack, RFGSMAttack, PGDAttack, OnePixelAttack, PixleAttack
+from attacks import Attack, FGSMAttack, RFGSMAttack, PGDAttack, OnePixelAttack, PixleAttack, SquareAttack
 
 torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
@@ -34,6 +34,8 @@ def create_attack(attack_type, attack_params) -> Attack:
         return OnePixelAttack("OnePixel", **attack_params["one_pixel"])
     elif attack_type == "pixle":
         return PixleAttack("Pixle", **attack_params["pixle"])
+    elif attack_type == "square":
+        return SquareAttack("Square", **attack_params["square"])
     else:
         raise ValueError("Invalid attack type")
 
