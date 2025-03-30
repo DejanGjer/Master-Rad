@@ -3,10 +3,15 @@ train_split = 0.8
 validation_split = 0.2 # test set is loaded separately  
 
 # attack parameters
-attack_type = 'fgsm'
+attack_type = 'square'
 attack_params = {
     "fgsm": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05]
+    },
+    "rfgsm": {
+        "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
+        "alpha": 2/255,
+        "steps": 40
     },
     "pgd": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
@@ -26,7 +31,17 @@ attack_params = {
         "restarts": 20,
         "max_iterations": 10,
         "update_each_iteration": False
-    }
+    },
+    "square": {
+        "norm": "Linf", # # L2 or Linf
+        "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
+        "n_queries": 5000,
+        "n_restarts": 1,
+        "p_init": 0.8,
+        "loss": "ce", # margin or ce
+        "resc_schedule": True,
+        "seed": 42,
+    },
 }
 
 # hyperparameters
