@@ -1,10 +1,10 @@
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
+import random
 import numpy as np
 import time
 import os
-import shutil
 
 import pandas as pd
 
@@ -21,6 +21,7 @@ torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+random.seed(config.seed)
 np.random.seed(42)
 
 def create_attack(attack_type, attack_params) -> Attack:

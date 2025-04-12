@@ -1,5 +1,6 @@
 checkpoint_dir = 'checkpoints'
 create_new_saving_dir = True
+seed = 42
 
 model_info = {
     "normal": {

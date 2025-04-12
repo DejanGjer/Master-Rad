@@ -1,5 +1,7 @@
 import os
 
+import random
+import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -9,6 +11,12 @@ from resnet18 import ResNet18
 from dataset import cifar10_loader_resnet, transform_base_train, transform_base_test
 from utils import set_compute_device, create_save_directories, save_config_file
 
+torch.manual_seed(config.seed)
+generator = torch.Generator().manual_seed(config.seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+random.seed(config.seed)
+np.random.seed(config.seed)
 
 def train(model, device, train_loader, optimizer, epoch, loss_fn):
     model.train()
