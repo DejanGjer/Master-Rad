@@ -4,6 +4,7 @@ from typing import List
 import matplotlib.pyplot as plt
 import torch
 import os
+import shutil
 
 def normalize_images(images: torch.Tensor, mean: List[float], std: List[float]) -> torch.Tensor:
     assert torch.max(images) <= 1.0 and torch.min(images) >= 0.0, "Images are not in range [0, 1]"
@@ -29,6 +30,10 @@ def create_save_directories(root_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     return dir_path
+
+def save_config_file(save_dir: str, filename: str):
+    config_save_path = os.path.join(save_dir, filename)
+    shutil.copyfile(filename, config_save_path)
 
 def plot_loss_history(metrics, save_path):
     # Plot loss history

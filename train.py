@@ -1,4 +1,3 @@
-import time
 import os
 
 import torch
@@ -8,7 +7,7 @@ import torch.nn.functional as F
 import config_train as config
 from resnet18 import ResNet18
 from dataset import cifar10_loader_resnet, transform_base_train, transform_base_test
-from utils import set_compute_device, create_save_directories
+from utils import set_compute_device, create_save_directories, save_config_file
 
 
 def train(model, device, train_loader, optimizer, epoch, loss_fn):
@@ -224,6 +223,7 @@ if __name__ == "__main__":
         save_dir = create_save_directories(os.path.join(os.getcwd(), config.checkpoint_dir))
     else:
         save_dir = os.path.join(os.getcwd(), config.checkpoint_dir)
+    save_config_file(save_dir, "config_train.py")
 
     model_normal, model_negative, model_hybrid_nor, model_hybrid_neg = None, None, None, None
     model_synergy_nor, model_synergy_neg, model_synergy_all = None, None, None

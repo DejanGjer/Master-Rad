@@ -10,7 +10,7 @@ import pandas as pd
 
 import config
 from resnet18 import ResNet, BasicBlock
-from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device
+from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device, save_config_file
 from dataset import cifar10_loader_resnet, transform_train, transform_test, AttackDataset
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
@@ -129,8 +129,7 @@ if __name__ == "__main__":
     metrics = pd.DataFrame(metrics)
     metrics.to_csv(os.path.join(save_dir, 'losses.csv'), index=False)
     # save configuration file
-    config_save_path = os.path.join(save_dir, 'config.py')
-    shutil.copyfile('config.py', config_save_path)
+    save_config_file(save_dir, 'config.py')
 
     # Loading models needed for testing
     test_models = []
