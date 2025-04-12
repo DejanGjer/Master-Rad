@@ -122,7 +122,7 @@ if __name__ == "__main__":
         metrics["train_loss"].append(np.mean(train_losses))
         metrics["validation_loss"].append(np.mean(validation_losses))
 
-    save_dir, pgd_save_dir = create_save_directories(config.save_root_path, config.pgd_save_path if config.attack_type == "pgd" else None)
+    save_dir = create_save_directories(config.save_root_path)
     save_model(model, os.path.join(save_dir, 'unet_denoiser.pt'))
     plot_loss_history(metrics, save_dir)
     # convert metrics to pandas dataframe and save it

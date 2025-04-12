@@ -1,4 +1,5 @@
 import time
+import os
 
 import torch
 import torch.optim as optim
@@ -7,7 +8,7 @@ import torch.nn.functional as F
 import config_train as config
 from resnet18 import ResNet18
 from dataset import cifar10_loader_resnet, transform_base_train, transform_base_test
-from utils import set_compute_device
+from utils import set_compute_device, create_save_directories
 
 
 def train(model, device, train_loader, optimizer, epoch, loss_fn):
@@ -53,6 +54,148 @@ def test(model, device, test_loader, loss_fn, dataset_name=None, filter_map=None
 
     return index_store
 
+def train_normal_model(save_dir, device, train_loader):
+    model_normal_name = config.model_name_to_path["normal"]
+    model_normal_path = os.path.join(save_dir, model_normal_name)
+    if os.path.exists(model_normal_path):
+        return
+    model_normal = ResNet18('normal').to(device)
+    optimizer_normal = optim.SGD(filter(lambda p: p.requires_grad,
+                                model_normal.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer_normal, milestones=config.milestones, gamma=0.1)
+    for epoch in range(1, config.epochs + 1):
+        train(model_normal, device, train_loader, optimizer_normal,
+            epoch, loss_fn=F.cross_entropy)
+        scheduler.step()
+    model_normal.freeze()
+    torch.save(model_normal, model_normal_path)
+    unload_model(model_normal)
+
+def train_negative_model(save_dir, device, train_loader):
+    model_negative_name = config.model_name_to_path["negative"]
+    model_negative_path = os.path.join(save_dir, model_negative_name)
+    if os.path.exists(model_negative_path):
+        return
+    model_negative = ResNet18('negative').to(device)
+    optimizer_negative = optim.SGD(filter(lambda p: p.requires_grad,
+                                model_negative.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer_negative, milestones=config.milestones, gamma=0.1)
+    for epoch in range(1, config.epochs + 1):
+        train(model_negative, device, train_loader, optimizer_negative,
+            epoch, loss_fn=F.cross_entropy)
+        scheduler.step()
+    model_negative.freeze()
+    torch.save(model_negative, model_negative_path)
+    unload_model(model_negative)
+
+def train_hybrid_nor_model(save_dir, device, train_loader, model_normal):
+    model_hybrid_nor_name = config.model_name_to_path["hybrid_nor"]
+    model_hybrid_nor_path = os.path.join(save_dir, model_hybrid_nor_name)
+    if os.path.exists(model_hybrid_nor_path):
+        return
+    model_hybrid_nor = ResNet18('hybrid_nor').to(device)
+    model_hybrid_nor.set_conv_layers_normal(model_normal.get_conv_layers_normal())
+    model_hybrid_nor.freeze()
+    optimizer_hybrid_nor = optim.SGD(filter(lambda p: p.requires_grad,
+                                model_hybrid_nor.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_nor, milestones=config.milestones, gamma=0.1)
+    for epoch in range(1, config.epochs + 1):
+        train(model_hybrid_nor, device, train_loader, optimizer_hybrid_nor,
+            epoch, loss_fn=F.cross_entropy)
+        scheduler.step()
+    torch.save(model_hybrid_nor, model_hybrid_nor_path)
+    unload_model(model_hybrid_nor)
+
+def train_hybrid_neg_model(save_dir, device, train_loader, model_negative):
+    model_hybrid_neg_name = config.model_name_to_path["hybrid_neg"]
+    model_hybrid_neg_path = os.path.join(save_dir, model_hybrid_neg_name)
+    if os.path.exists(model_hybrid_neg_path):
+        return
+    model_hybrid_neg = ResNet18('hybrid_neg').to(device)
+    model_hybrid_neg.set_conv_layers_negative(model_negative.get_conv_layers_negative())
+    model_hybrid_neg.freeze()
+    optimizer_hybrid_neg = optim.SGD(filter(lambda p: p.requires_grad,
+                                model_hybrid_neg.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_neg, milestones=config.milestones, gamma=0.1)
+    for epoch in range(1, config.epochs + 1):
+        train(model_hybrid_neg, device, train_loader, optimizer_hybrid_neg,
+            epoch, loss_fn=F.cross_entropy)
+        scheduler.step()
+    torch.save(model_hybrid_neg, model_hybrid_neg_path)
+    unload_model(model_hybrid_neg)
+
+def get_synergy_nor_model(save_dir, device, model_normal, model_hybrid_nor):
+    model_synergy_nor_name = config.model_name_to_path["synergy_nor"]
+    model_synergy_nor_path = os.path.join(save_dir, model_synergy_nor_name)
+    if os.path.exists(model_synergy_nor_path):
+        return
+    model_synergy_nor = ResNet18('synergy_nor').to(device)
+    model_synergy_nor.set_conv_layers_normal(model_normal.get_conv_layers_normal())
+    model_synergy_nor.set_linear_normal(model_normal.linear_normal)
+    model_synergy_nor.set_linear_normal_n(model_hybrid_nor.linear_normal_n)
+    model_synergy_nor.freeze()
+    torch.save(model_synergy_nor, model_synergy_nor_path)
+    unload_model(model_synergy_nor)
+
+def get_synergy_neg_model(save_dir, device, model_negative, model_hybrid_neg):
+    model_synergy_neg_name = config.model_name_to_path["synergy_neg"]
+    model_synergy_neg_path = os.path.join(save_dir, model_synergy_neg_name)
+    if os.path.exists(model_synergy_neg_path):
+        return
+    model_synergy_neg = ResNet18('synergy_neg').to(device)
+    model_synergy_neg.set_conv_layers_negative(model_negative.get_conv_layers_negative())
+    model_synergy_neg.set_linear_negative_n(model_negative.linear_negative_n)
+    model_synergy_neg.set_linear_negative(model_hybrid_neg.linear_negative)
+    model_synergy_neg.freeze()
+    torch.save(model_synergy_neg, model_synergy_neg_path)
+    unload_model(model_synergy_neg)
+
+def get_synergy_all_model(save_dir, device, model_normal, model_negative, model_hybrid_nor, model_hybrid_neg):
+    model_synergy_all_name = config.model_name_to_path["synergy_all"]
+    model_synergy_all_path = os.path.join(save_dir, model_synergy_all_name)
+    if os.path.exists(model_synergy_all_path):
+        return
+    model_synergy_all = ResNet18('synergy_all').to(device)
+    model_synergy_all.set_conv_layers_normal(model_normal.get_conv_layers_normal())
+    model_synergy_all.set_conv_layers_negative(model_negative.get_conv_layers_negative())
+    model_synergy_all.set_linear_normal(model_normal.linear_normal)
+    model_synergy_all.set_linear_normal_n(model_hybrid_nor.linear_normal_n)
+    model_synergy_all.set_linear_negative_n(model_negative.linear_negative_n)
+    model_synergy_all.set_linear_negative(model_hybrid_neg.linear_negative)
+    torch.save(model_synergy_all, model_synergy_all_path)
+    unload_model(model_synergy_all)
+
+def train_tr_synergy_all_model(save_dir, device, model_normal, model_negative):
+    model_tr_synergy_all_name = config.model_name_to_path["tr_synergy_all"]
+    model_tr_synergy_all_path = os.path.join(save_dir, model_tr_synergy_all_name)
+    if os.path.exists(model_tr_synergy_all_path):
+        return
+    tr_synergy_all = ResNet18('tr_synergy_all').to(device)
+    tr_synergy_all.set_conv_layers_normal(model_normal.get_conv_layers_normal())
+    tr_synergy_all.set_conv_layers_negative(model_negative.get_conv_layers_negative())
+    tr_synergy_all.freeze()
+    optimizer_tr_synergy_all = optim.SGD(filter(lambda p: p.requires_grad,
+                                tr_synergy_all.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer_tr_synergy_all, milestones=config.milestones, gamma=0.1)
+    for epoch in range(1, config.epochs + 1):
+        train(tr_synergy_all, device, train_loader, optimizer_tr_synergy_all,
+            epoch, loss_fn=F.cross_entropy)
+        scheduler.step()
+    torch.save(tr_synergy_all, model_tr_synergy_all_path)
+    unload_model(tr_synergy_all)
+
+def load_model(model_name, save_dir, device):
+    model_path = os.path.join(save_dir, config.model_name_to_path[model_name])
+    if os.path.exists(model_path):
+        return torch.load(model_path, weights_only=False).to(device)
+    else:
+        raise FileNotFoundError(f"Model file {model_path} not found.")
+    
+def unload_model(model):
+    del model
+    torch.cuda.empty_cache()
+
+
 def print_training_info(device):
     print("Configuration details:")
     print(f"Learning rate: {config.learning_rate}")
@@ -76,21 +219,63 @@ if __name__ == "__main__":
     train_loader = loader(device, config.batch_size, transform_base_train, train=True)
     test_loader = loader(device, config.batch_size, transform_base_test)
 
-    model_normal = ResNet18('normal').to(device)
+    save_dir = None
+    if config.create_new_saving_dir:
+        save_dir = create_save_directories(os.path.join(os.getcwd(), config.checkpoint_dir))
+    else:
+        save_dir = os.path.join(os.getcwd(), config.checkpoint_dir)
 
-    # ---- Normal net:
+    model_normal, model_negative, model_hybrid_nor, model_hybrid_neg = None, None, None, None
+    model_synergy_nor, model_synergy_neg, model_synergy_all = None, None, None
+    model_tr_synergy_all = None
 
-    optimizer_normal = optim.SGD(filter(lambda p: p.requires_grad,
-                                model_normal.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer_normal, milestones=config.milestones, gamma=0.1)
-    start_time = time.time()
-
-
-    for epoch in range(1, config.epochs + 1):
-        train(model_normal, device, train_loader, optimizer_normal,
-            epoch, loss_fn=F.cross_entropy)
-        scheduler.step()
-
-    model_normal.freeze()
-    torch.save(model_normal, 'model_normal.pt')
+    if config.models_to_train["normal"]:
+        print("Training normal model...")
+        train_normal_model(save_dir, device, train_loader)
+    if config.models_to_train["negative"]:
+        print("Training negative model...")
+        train_negative_model(save_dir, device, train_loader)
+    if config.models_to_train["hybrid_nor"]:
+        print("Training hybrid normal model...")
+        model_normal = load_model("normal", save_dir, device)
+        train_hybrid_nor_model(save_dir, device, train_loader, model_normal)
+        unload_model(model_normal)
+    if config.models_to_train["hybrid_neg"]:
+        print("Training hybrid negative model...")
+        model_negative = load_model("negative", save_dir, device)
+        train_hybrid_neg_model(save_dir, device, train_loader, model_negative)
+        unload_model(model_negative)
+    if config.models_to_train["synergy_nor"]:
+        print("Training synergy normal model...")
+        model_normal = load_model("normal", save_dir, device)
+        model_hybrid_nor = load_model("hybrid_nor", save_dir, device)
+        get_synergy_nor_model(save_dir, device, model_normal, model_hybrid_nor)
+        unload_model(model_normal)
+        unload_model(model_hybrid_nor)
+    if config.models_to_train["synergy_neg"]:
+        print("Training synergy negative model...")
+        model_negative = load_model("negative", save_dir, device)
+        model_hybrid_neg = load_model("hybrid_neg", save_dir, device)
+        get_synergy_neg_model(save_dir, device, model_negative, model_hybrid_neg)
+        unload_model(model_negative)
+        unload_model(model_hybrid_neg)
+    if config.models_to_train["synergy_all"]:
+        print("Training synergy all model...")
+        model_normal = load_model("normal", save_dir, device)
+        model_negative = load_model("negative", save_dir, device)
+        model_hybrid_nor = load_model("hybrid_nor", save_dir, device)
+        model_hybrid_neg = load_model("hybrid_neg", save_dir, device)
+        get_synergy_all_model(save_dir, device, model_normal, model_negative, model_hybrid_nor, model_hybrid_neg)
+        unload_model(model_normal)
+        unload_model(model_negative)
+        unload_model(model_hybrid_nor)
+        unload_model(model_hybrid_neg)
+    if config.models_to_train["tr_synergy_all"]:
+        print("Training tr synergy all model...")
+        model_normal = load_model("normal", save_dir, device)
+        model_negative = load_model("negative", save_dir, device)
+        train_tr_synergy_all_model(save_dir, device, model_normal, model_negative)
+        unload_model(model_normal)
+        unload_model(model_negative)
+    
 
