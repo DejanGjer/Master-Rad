@@ -26,7 +26,7 @@ def train(model, device, train_loader, optimizer, epoch, loss_fn):
                           100. * batch_idx / len(train_loader), loss.item()))
 
 
-def test(model, device, test_loader, loss_fn, dataset_name=None, filter_map=None):
+def test(model, device, test_loader, loss_fn):
     model.eval()
     test_loss = 0
     correct = 0
@@ -34,16 +34,13 @@ def test(model, device, test_loader, loss_fn, dataset_name=None, filter_map=None
     with torch.no_grad():
         for i, (data, target) in enumerate(test_loader):
             data, target = data.to(device), target.to(device)
-            if filter_map and dataset_name in filter_map:
-              for batch in data:
-                for channel in batch:
-                  channel.mul_(filter_map[dataset_name].to(device))
             output = model(data)
             test_loss += loss_fn(output, target, reduction='sum').item()
             pred = output.argmax(dim=1, keepdim=True)
             c = pred.eq(target.view_as(pred)).sum().item()
             correct += c
             index_store.append((i, c))
+    unload_model(model)
 
     test_loss /= len(test_loader.dataset)
 
@@ -54,7 +51,7 @@ def test(model, device, test_loader, loss_fn, dataset_name=None, filter_map=None
     return index_store
 
 def train_normal_model(save_dir, device, train_loader):
-    model_normal_name = config.model_name_to_path["normal"]
+    model_normal_name = config.model_info["normal"]["model_path"]
     model_normal_path = os.path.join(save_dir, model_normal_name)
     if os.path.exists(model_normal_path):
         return
@@ -71,7 +68,7 @@ def train_normal_model(save_dir, device, train_loader):
     unload_model(model_normal)
 
 def train_negative_model(save_dir, device, train_loader):
-    model_negative_name = config.model_name_to_path["negative"]
+    model_negative_name = config.model_info["negative"]["model_path"]
     model_negative_path = os.path.join(save_dir, model_negative_name)
     if os.path.exists(model_negative_path):
         return
@@ -88,7 +85,7 @@ def train_negative_model(save_dir, device, train_loader):
     unload_model(model_negative)
 
 def train_hybrid_nor_model(save_dir, device, train_loader, model_normal):
-    model_hybrid_nor_name = config.model_name_to_path["hybrid_nor"]
+    model_hybrid_nor_name = config.model_info["hybrid_nor"]["model_path"]
     model_hybrid_nor_path = os.path.join(save_dir, model_hybrid_nor_name)
     if os.path.exists(model_hybrid_nor_path):
         return
@@ -106,7 +103,7 @@ def train_hybrid_nor_model(save_dir, device, train_loader, model_normal):
     unload_model(model_hybrid_nor)
 
 def train_hybrid_neg_model(save_dir, device, train_loader, model_negative):
-    model_hybrid_neg_name = config.model_name_to_path["hybrid_neg"]
+    model_hybrid_neg_name = config.model_info["hybrid_neg"]["model_path"]
     model_hybrid_neg_path = os.path.join(save_dir, model_hybrid_neg_name)
     if os.path.exists(model_hybrid_neg_path):
         return
@@ -124,7 +121,7 @@ def train_hybrid_neg_model(save_dir, device, train_loader, model_negative):
     unload_model(model_hybrid_neg)
 
 def get_synergy_nor_model(save_dir, device, model_normal, model_hybrid_nor):
-    model_synergy_nor_name = config.model_name_to_path["synergy_nor"]
+    model_synergy_nor_name = config.model_info["synergy_nor"]["model_path"]
     model_synergy_nor_path = os.path.join(save_dir, model_synergy_nor_name)
     if os.path.exists(model_synergy_nor_path):
         return
@@ -137,7 +134,7 @@ def get_synergy_nor_model(save_dir, device, model_normal, model_hybrid_nor):
     unload_model(model_synergy_nor)
 
 def get_synergy_neg_model(save_dir, device, model_negative, model_hybrid_neg):
-    model_synergy_neg_name = config.model_name_to_path["synergy_neg"]
+    model_synergy_neg_name = config.model_info["synergy_neg"]["model_path"]
     model_synergy_neg_path = os.path.join(save_dir, model_synergy_neg_name)
     if os.path.exists(model_synergy_neg_path):
         return
@@ -150,7 +147,7 @@ def get_synergy_neg_model(save_dir, device, model_negative, model_hybrid_neg):
     unload_model(model_synergy_neg)
 
 def get_synergy_all_model(save_dir, device, model_normal, model_negative, model_hybrid_nor, model_hybrid_neg):
-    model_synergy_all_name = config.model_name_to_path["synergy_all"]
+    model_synergy_all_name = config.model_info["synergy_all"]["model_path"]
     model_synergy_all_path = os.path.join(save_dir, model_synergy_all_name)
     if os.path.exists(model_synergy_all_path):
         return
@@ -165,7 +162,7 @@ def get_synergy_all_model(save_dir, device, model_normal, model_negative, model_
     unload_model(model_synergy_all)
 
 def train_tr_synergy_all_model(save_dir, device, model_normal, model_negative):
-    model_tr_synergy_all_name = config.model_name_to_path["tr_synergy_all"]
+    model_tr_synergy_all_name = config.model_info["tr_synergy_all"]["model_path"]
     model_tr_synergy_all_path = os.path.join(save_dir, model_tr_synergy_all_name)
     if os.path.exists(model_tr_synergy_all_path):
         return
@@ -184,7 +181,7 @@ def train_tr_synergy_all_model(save_dir, device, model_normal, model_negative):
     unload_model(tr_synergy_all)
 
 def load_model(model_name, save_dir, device):
-    model_path = os.path.join(save_dir, config.model_name_to_path[model_name])
+    model_path = os.path.join(save_dir, config.model_info[model_name]["model_path"])
     if os.path.exists(model_path):
         return torch.load(model_path, weights_only=False).to(device)
     else:
@@ -229,37 +226,69 @@ if __name__ == "__main__":
     model_synergy_nor, model_synergy_neg, model_synergy_all = None, None, None
     model_tr_synergy_all = None
 
-    if config.models_to_train["normal"]:
+    model_info = config.model_info
+
+    if model_info["normal"]["train"]:
         print("Training normal model...")
         train_normal_model(save_dir, device, train_loader)
-    if config.models_to_train["negative"]:
+    if model_info["normal"]["test"]:
+        print("Testing normal model...")
+        model_normal = load_model("normal", save_dir, device)
+        test(model_normal, device, test_loader, loss_fn=F.cross_entropy)
+        
+    if model_info["negative"]["train"]:
         print("Training negative model...")
         train_negative_model(save_dir, device, train_loader)
-    if config.models_to_train["hybrid_nor"]:
+    if model_info["negative"]["test"]:
+        print("Testing negative model...")
+        model_negative = load_model("negative", save_dir, device)
+        test(model_negative, device, test_loader, loss_fn=F.cross_entropy)
+
+    if model_info["hybrid_nor"]["train"]:
         print("Training hybrid normal model...")
         model_normal = load_model("normal", save_dir, device)
         train_hybrid_nor_model(save_dir, device, train_loader, model_normal)
         unload_model(model_normal)
-    if config.models_to_train["hybrid_neg"]:
+    if model_info["hybrid_nor"]["test"]:
+        print("Testing hybrid normal model...")
+        model_hybrid_nor = load_model("hybrid_nor", save_dir, device)
+        test(model_hybrid_nor, device, test_loader, loss_fn=F.cross_entropy)
+
+    if model_info["hybrid_neg"]["train"]:
         print("Training hybrid negative model...")
         model_negative = load_model("negative", save_dir, device)
         train_hybrid_neg_model(save_dir, device, train_loader, model_negative)
         unload_model(model_negative)
-    if config.models_to_train["synergy_nor"]:
+    if model_info["hybrid_neg"]["test"]:
+        print("Testing hybrid negative model...")
+        model_hybrid_neg = load_model("hybrid_neg", save_dir, device)
+        test(model_hybrid_neg, device, test_loader, loss_fn=F.cross_entropy)
+
+    if model_info["synergy_nor"]["train"]:
         print("Training synergy normal model...")
         model_normal = load_model("normal", save_dir, device)
         model_hybrid_nor = load_model("hybrid_nor", save_dir, device)
         get_synergy_nor_model(save_dir, device, model_normal, model_hybrid_nor)
         unload_model(model_normal)
         unload_model(model_hybrid_nor)
-    if config.models_to_train["synergy_neg"]:
+    if model_info["synergy_nor"]["test"]:
+        print("Testing synergy normal model...")
+        model_synergy_nor = load_model("synergy_nor", save_dir, device)
+        test(model_synergy_nor, device, test_loader, loss_fn=F.cross_entropy)
+
+    if model_info["synergy_neg"]["train"]:
         print("Training synergy negative model...")
         model_negative = load_model("negative", save_dir, device)
         model_hybrid_neg = load_model("hybrid_neg", save_dir, device)
         get_synergy_neg_model(save_dir, device, model_negative, model_hybrid_neg)
         unload_model(model_negative)
         unload_model(model_hybrid_neg)
-    if config.models_to_train["synergy_all"]:
+    if model_info["synergy_neg"]["test"]:
+        print("Testing synergy negative model...")
+        model_synergy_neg = load_model("synergy_neg", save_dir, device)
+        test(model_synergy_neg, device, test_loader, loss_fn=F.cross_entropy)
+
+    if model_info["synergy_all"]["train"]:
         print("Training synergy all model...")
         model_normal = load_model("normal", save_dir, device)
         model_negative = load_model("negative", save_dir, device)
@@ -270,12 +299,19 @@ if __name__ == "__main__":
         unload_model(model_negative)
         unload_model(model_hybrid_nor)
         unload_model(model_hybrid_neg)
-    if config.models_to_train["tr_synergy_all"]:
+    if model_info["synergy_all"]["test"]:
+        print("Testing synergy all model...")
+        model_synergy_all = load_model("synergy_all", save_dir, device)
+        test(model_synergy_all, device, test_loader, loss_fn=F.cross_entropy)
+
+    if model_info["tr_synergy_all"]["train"]:
         print("Training tr synergy all model...")
         model_normal = load_model("normal", save_dir, device)
         model_negative = load_model("negative", save_dir, device)
         train_tr_synergy_all_model(save_dir, device, model_normal, model_negative)
         unload_model(model_normal)
         unload_model(model_negative)
-    
-
+    if model_info["tr_synergy_all"]["test"]:
+        print("Testing tr synergy all model...")
+        model_tr_synergy_all = load_model("tr_synergy_all", save_dir, device)
+        test(model_tr_synergy_all, device, test_loader, loss_fn=F.cross_entropy)
