@@ -24,6 +24,9 @@ torch.backends.cudnn.benchmark = False
 random.seed(config.seed)
 np.random.seed(42)
 
+torch_generator = torch.Generator()
+torch_generator.manual_seed(config.seed)
+
 def create_attack(attack_type, attack_params) -> Attack:
     if attack_type == "fgsm":
         return FGSMAttack("FGSM", **attack_params["fgsm"])
@@ -55,7 +58,8 @@ def create_attack_dataset(attack, attack_loader, models):
     attack_train_dataset = AttackDataset(adv_images, org_images, model_idxs)
     # split training dataset into training and validation
     attack_train_dataset, attack_validation_dataset = random_split(attack_train_dataset, 
-                                                    [config.train_split, config.validation_split])
+                                                    [config.train_split, config.validation_split],
+                                                    generator=torch_generator)
     attack_train_loader = DataLoader(attack_train_dataset, batch_size=config.batch_size, shuffle=True)
     attack_validation_loader = DataLoader(attack_validation_dataset, batch_size=config.batch_size, shuffle=False)
 
@@ -86,8 +90,8 @@ if __name__ == "__main__":
         print(f"Loaded model {attacked_models[-1].net_type}")
 
     loader = cifar10_loader_resnet
-    attack_loader = loader(device, config.batch_size, transform_train, train=True)
-    test_loader = loader(device, config.batch_size, transform_test)
+    attack_loader = loader(device, config.batch_size, transform_train, torch_generator=torch_generator, train=True)
+    test_loader = loader(device, config.batch_size, transform_test, torch_generator=torch_generator)
 
     print(f"Attack type: {config.attack_type}")
     attack = create_attack(config.attack_type, config.attack_params)

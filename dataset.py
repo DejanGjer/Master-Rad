@@ -59,10 +59,7 @@ def seed_worker(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
-g = torch.Generator()
-g.manual_seed(SEED)
-
-def cifar10_loader_resnet(device, batch_size, transform, train=False):
+def cifar10_loader_resnet(device, batch_size, transform, torch_generator, train=False):
     dataset = datasets.CIFAR10('../data', download=True, train=train,
                           transform=transform)
     # if we are using cpu, take only subset of dataset
@@ -71,5 +68,5 @@ def cifar10_loader_resnet(device, batch_size, transform, train=False):
         random_indices = random.sample(range(len(dataset)), num_samples)
         dataset = Subset(dataset, random_indices)
 
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train, worker_init_fn=seed_worker, generator=g)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train, worker_init_fn=seed_worker, generator=torch_generator)
     return dataloader

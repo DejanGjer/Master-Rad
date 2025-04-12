@@ -5,11 +5,13 @@ import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.utils.data import random_split
 
 import config_train as config
 from resnet18 import ResNet18
 from dataset import cifar10_loader_resnet, transform_base_train, transform_base_test
 from utils import set_compute_device, create_save_directories, save_config_file
+from dataset import seed_worker
 
 torch.manual_seed(config.seed)
 generator = torch.Generator().manual_seed(config.seed)
@@ -17,6 +19,9 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 random.seed(config.seed)
 np.random.seed(config.seed)
+
+torch_generator = torch.Generator()
+torch_generator.manual_seed(config.seed)
 
 def train(model, device, train_loader, optimizer, epoch, loss_fn):
     model.train()
@@ -199,6 +204,26 @@ def unload_model(model):
     del model
     torch.cuda.empty_cache()
 
+def create_datasets():
+    loader = cifar10_loader_resnet
+    train_loader = loader(device, config.batch_size, transform_base_train, torch_generator=torch_generator, train=True)
+    test_loader = loader(device, config.batch_size, transform_base_test, torch_generator=torch_generator)
+    # split training dataset into training and validation
+    train_dataset, validation_dataset = random_split(train_loader.dataset, 
+                                                    [config.train_split, config.validation_split],
+                                                    generator=torch_generator)
+    train_loader = torch.utils.data.DataLoader(train_dataset, 
+                                               batch_size=config.batch_size, 
+                                               shuffle=True, 
+                                               worker_init_fn=seed_worker, 
+                                               generator=torch_generator)
+    validation_loader = torch.utils.data.DataLoader(validation_dataset, 
+                                                    batch_size=config.batch_size, 
+                                                    shuffle=False, 
+                                                    worker_init_fn=seed_worker, 
+                                                    generator=torch_generator)
+    return train_loader, validation_loader, test_loader
+
 
 def print_training_info(device):
     print("Configuration details:")
@@ -215,13 +240,7 @@ def print_training_info(device):
 if __name__ == "__main__":
     # Set device
     device = set_compute_device()
-
     print_training_info(device)
-
-    loader = cifar10_loader_resnet
-
-    train_loader = loader(device, config.batch_size, transform_base_train, train=True)
-    test_loader = loader(device, config.batch_size, transform_base_test)
 
     save_dir = None
     if config.create_new_saving_dir:
@@ -229,6 +248,12 @@ if __name__ == "__main__":
     else:
         save_dir = os.path.join(os.getcwd(), config.checkpoint_dir)
     save_config_file(save_dir, "config_train.py")
+
+    train_loader, validation_loader, test_loader = create_datasets()
+    print(f"Training set size: {len(train_loader.dataset)}")
+    print(f"Validation set size: {len(validation_loader.dataset)}")
+    print(f"Test set size: {len(test_loader.dataset)}")
+    print("---------------------------------")
 
     model_normal, model_negative, model_hybrid_nor, model_hybrid_neg = None, None, None, None
     model_synergy_nor, model_synergy_neg, model_synergy_all = None, None, None
