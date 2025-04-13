@@ -6,6 +6,7 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import random_split
+from tqdm import tqdm
 
 import config_train as config
 from resnet18 import ResNet18
@@ -23,21 +24,34 @@ np.random.seed(config.seed)
 torch_generator = torch.Generator()
 torch_generator.manual_seed(config.seed)
 
-def train(model, device, train_loader, optimizer, epoch, loss_fn):
+def train(model, device, train_loader, validation_loader, optimizer, epoch, loss_fn):
     model.train()
-    for batch_idx, (data, target) in enumerate(train_loader):
+    total_loss = 0
+    for batch_idx, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader)):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
         output = model(data)
         loss = loss_fn(output, target)
         loss.backward()
+        total_loss += loss.item() * len(data)
         optimizer.step()
-        if batch_idx % 5000 == 0:
-            print('[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'
-                  .format(model.net_type, epoch, batch_idx * len(data),
-                          len(train_loader.dataset),
-                          100. * batch_idx / len(train_loader), loss.item()))
 
+    print(f"Epoch: {epoch}, Average Loss: {total_loss / len(train_loader.dataset):.6f}")
+    validate(model, device, validation_loader, loss_fn)
+            
+def validate(model, device, validation_loader, loss_fn):
+    model.eval()
+    validation_loss = 0
+    correct = 0
+    with torch.no_grad():
+        for data, target in tqdm(validation_loader, total=len(validation_loader)):
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            validation_loss += loss_fn(output, target, reduction='sum').item()
+            pred = output.argmax(dim=1, keepdim=True)
+            correct += pred.eq(target.view_as(pred)).sum().item()
+    validation_loss /= len(validation_loader.dataset)
+    print(f"Validation set: Average loss: {validation_loss:.6f}, Accuracy: {correct}/{len(validation_loader.dataset)} ({100. * correct / len(validation_loader.dataset):.2f}%)")
 
 def test(model, device, test_loader, loss_fn):
     model.eval()
@@ -57,13 +71,12 @@ def test(model, device, test_loader, loss_fn):
 
     test_loss /= len(test_loader.dataset)
 
-    print('[{}] Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'
+    print('[{}] Test set: Average loss: {:.6f}, Accuracy: {}/{} ({:.2f}%)'
           .format(model.net_type, test_loss, correct, len(test_loader.dataset),
                   100. * correct / len(test_loader.dataset)))
-
     return index_store
 
-def train_normal_model(save_dir, device, train_loader):
+def train_normal_model(save_dir, device, train_loader, validation_loader):
     model_normal_name = config.model_info["normal"]["model_path"]
     model_normal_path = os.path.join(save_dir, model_normal_name)
     if os.path.exists(model_normal_path):
@@ -73,14 +86,14 @@ def train_normal_model(save_dir, device, train_loader):
                                 model_normal.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_normal, milestones=config.milestones, gamma=0.1)
     for epoch in range(1, config.epochs + 1):
-        train(model_normal, device, train_loader, optimizer_normal,
+        train(model_normal, device, train_loader, validation_loader, optimizer_normal,
             epoch, loss_fn=F.cross_entropy)
         scheduler.step()
     model_normal.freeze()
     torch.save(model_normal, model_normal_path)
     unload_model(model_normal)
 
-def train_negative_model(save_dir, device, train_loader):
+def train_negative_model(save_dir, device, train_loader, validation_loader):
     model_negative_name = config.model_info["negative"]["model_path"]
     model_negative_path = os.path.join(save_dir, model_negative_name)
     if os.path.exists(model_negative_path):
@@ -90,14 +103,14 @@ def train_negative_model(save_dir, device, train_loader):
                                 model_negative.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_negative, milestones=config.milestones, gamma=0.1)
     for epoch in range(1, config.epochs + 1):
-        train(model_negative, device, train_loader, optimizer_negative,
+        train(model_negative, device, train_loader, validation_loader, optimizer_negative,
             epoch, loss_fn=F.cross_entropy)
         scheduler.step()
     model_negative.freeze()
     torch.save(model_negative, model_negative_path)
     unload_model(model_negative)
 
-def train_hybrid_nor_model(save_dir, device, train_loader, model_normal):
+def train_hybrid_nor_model(save_dir, device, train_loader, validation_loader, model_normal):
     model_hybrid_nor_name = config.model_info["hybrid_nor"]["model_path"]
     model_hybrid_nor_path = os.path.join(save_dir, model_hybrid_nor_name)
     if os.path.exists(model_hybrid_nor_path):
@@ -109,13 +122,13 @@ def train_hybrid_nor_model(save_dir, device, train_loader, model_normal):
                                 model_hybrid_nor.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_nor, milestones=config.milestones, gamma=0.1)
     for epoch in range(1, config.epochs + 1):
-        train(model_hybrid_nor, device, train_loader, optimizer_hybrid_nor,
+        train(model_hybrid_nor, device, train_loader, validation_loader, optimizer_hybrid_nor,
             epoch, loss_fn=F.cross_entropy)
         scheduler.step()
     torch.save(model_hybrid_nor, model_hybrid_nor_path)
     unload_model(model_hybrid_nor)
 
-def train_hybrid_neg_model(save_dir, device, train_loader, model_negative):
+def train_hybrid_neg_model(save_dir, device, train_loader, validation_loader, model_negative):
     model_hybrid_neg_name = config.model_info["hybrid_neg"]["model_path"]
     model_hybrid_neg_path = os.path.join(save_dir, model_hybrid_neg_name)
     if os.path.exists(model_hybrid_neg_path):
@@ -127,7 +140,7 @@ def train_hybrid_neg_model(save_dir, device, train_loader, model_negative):
                                 model_hybrid_neg.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_neg, milestones=config.milestones, gamma=0.1)
     for epoch in range(1, config.epochs + 1):
-        train(model_hybrid_neg, device, train_loader, optimizer_hybrid_neg,
+        train(model_hybrid_neg, device, train_loader, validation_loader, optimizer_hybrid_neg,
             epoch, loss_fn=F.cross_entropy)
         scheduler.step()
     torch.save(model_hybrid_neg, model_hybrid_neg_path)
@@ -174,7 +187,7 @@ def get_synergy_all_model(save_dir, device, model_normal, model_negative, model_
     torch.save(model_synergy_all, model_synergy_all_path)
     unload_model(model_synergy_all)
 
-def train_tr_synergy_all_model(save_dir, device, model_normal, model_negative):
+def train_tr_synergy_all_model(save_dir, device, train_loader, validation_loader, model_normal, model_negative):
     model_tr_synergy_all_name = config.model_info["tr_synergy_all"]["model_path"]
     model_tr_synergy_all_path = os.path.join(save_dir, model_tr_synergy_all_name)
     if os.path.exists(model_tr_synergy_all_path):
@@ -187,7 +200,7 @@ def train_tr_synergy_all_model(save_dir, device, model_normal, model_negative):
                                 tr_synergy_all.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_tr_synergy_all, milestones=config.milestones, gamma=0.1)
     for epoch in range(1, config.epochs + 1):
-        train(tr_synergy_all, device, train_loader, optimizer_tr_synergy_all,
+        train(tr_synergy_all, device, train_loader, validation_loader, optimizer_tr_synergy_all,
             epoch, loss_fn=F.cross_entropy)
         scheduler.step()
     torch.save(tr_synergy_all, model_tr_synergy_all_path)
@@ -263,7 +276,7 @@ if __name__ == "__main__":
 
     if model_info["normal"]["train"]:
         print("Training normal model...")
-        train_normal_model(save_dir, device, train_loader)
+        train_normal_model(save_dir, device, train_loader, validation_loader)
     if model_info["normal"]["test"]:
         print("Testing normal model...")
         model_normal = load_model("normal", save_dir, device)
@@ -271,7 +284,7 @@ if __name__ == "__main__":
         
     if model_info["negative"]["train"]:
         print("Training negative model...")
-        train_negative_model(save_dir, device, train_loader)
+        train_negative_model(save_dir, device, train_loader, validation_loader)
     if model_info["negative"]["test"]:
         print("Testing negative model...")
         model_negative = load_model("negative", save_dir, device)
@@ -280,7 +293,7 @@ if __name__ == "__main__":
     if model_info["hybrid_nor"]["train"]:
         print("Training hybrid normal model...")
         model_normal = load_model("normal", save_dir, device)
-        train_hybrid_nor_model(save_dir, device, train_loader, model_normal)
+        train_hybrid_nor_model(save_dir, device, train_loader, validation_loader, model_normal)
         unload_model(model_normal)
     if model_info["hybrid_nor"]["test"]:
         print("Testing hybrid normal model...")
@@ -290,7 +303,7 @@ if __name__ == "__main__":
     if model_info["hybrid_neg"]["train"]:
         print("Training hybrid negative model...")
         model_negative = load_model("negative", save_dir, device)
-        train_hybrid_neg_model(save_dir, device, train_loader, model_negative)
+        train_hybrid_neg_model(save_dir, device, train_loader, validation_loader, model_negative)
         unload_model(model_negative)
     if model_info["hybrid_neg"]["test"]:
         print("Testing hybrid negative model...")
