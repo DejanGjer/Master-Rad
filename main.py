@@ -1,16 +1,16 @@
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
+import random
 import numpy as np
 import time
 import os
-import shutil
 
 import pandas as pd
 
 import config
 from resnet18 import ResNet, BasicBlock
-from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device
+from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device, save_config_file
 from dataset import cifar10_loader_resnet, transform_train, transform_test, AttackDataset
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
@@ -21,7 +21,11 @@ torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+random.seed(config.seed)
 np.random.seed(42)
+
+torch_generator = torch.Generator()
+torch_generator.manual_seed(config.seed)
 
 def create_attack(attack_type, attack_params) -> Attack:
     if attack_type == "fgsm":
@@ -54,7 +58,8 @@ def create_attack_dataset(attack, attack_loader, models):
     attack_train_dataset = AttackDataset(adv_images, org_images, model_idxs)
     # split training dataset into training and validation
     attack_train_dataset, attack_validation_dataset = random_split(attack_train_dataset, 
-                                                    [config.train_split, config.validation_split])
+                                                    [config.train_split, config.validation_split],
+                                                    generator=torch_generator)
     attack_train_loader = DataLoader(attack_train_dataset, batch_size=config.batch_size, shuffle=True)
     attack_validation_loader = DataLoader(attack_validation_dataset, batch_size=config.batch_size, shuffle=False)
 
@@ -85,8 +90,8 @@ if __name__ == "__main__":
         print(f"Loaded model {attacked_models[-1].net_type}")
 
     loader = cifar10_loader_resnet
-    attack_loader = loader(device, config.batch_size, transform_train, train=True)
-    test_loader = loader(device, config.batch_size, transform_test)
+    attack_loader = loader(device, config.batch_size, transform_train, torch_generator=torch_generator, train=True)
+    test_loader = loader(device, config.batch_size, transform_test, torch_generator=torch_generator)
 
     print(f"Attack type: {config.attack_type}")
     attack = create_attack(config.attack_type, config.attack_params)
@@ -122,15 +127,14 @@ if __name__ == "__main__":
         metrics["train_loss"].append(np.mean(train_losses))
         metrics["validation_loss"].append(np.mean(validation_losses))
 
-    save_dir, pgd_save_dir = create_save_directories(config.save_root_path, config.pgd_save_path if config.attack_type == "pgd" else None)
+    save_dir = create_save_directories(config.save_root_path)
     save_model(model, os.path.join(save_dir, 'unet_denoiser.pt'))
-    plot_loss_history(metrics, save_dir)
+    plot_loss_history(metrics, os.path.join(save_dir, 'loss_history.png'))
     # convert metrics to pandas dataframe and save it
     metrics = pd.DataFrame(metrics)
     metrics.to_csv(os.path.join(save_dir, 'losses.csv'), index=False)
     # save configuration file
-    config_save_path = os.path.join(save_dir, 'config.py')
-    shutil.copyfile('config.py', config_save_path)
+    save_config_file(save_dir, 'config.py')
 
     # Loading models needed for testing
     test_models = []

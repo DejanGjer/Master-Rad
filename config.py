@@ -3,7 +3,7 @@ train_split = 0.8
 validation_split = 0.2 # test set is loaded separately  
 
 # attack parameters
-attack_type = 'square'
+attack_type = 'fgsm'
 attack_params = {
     "fgsm": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05]
@@ -51,6 +51,7 @@ epochs = 15
 bilinear = True
 learn_noise = True
 loss = 'lgd' # type of the loss can be pgd and lgd
+seed = 42
 
 # model paths
 train_model_paths = [

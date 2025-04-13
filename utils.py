@@ -4,6 +4,7 @@ from typing import List
 import matplotlib.pyplot as plt
 import torch
 import os
+import shutil
 
 def normalize_images(images: torch.Tensor, mean: List[float], std: List[float]) -> torch.Tensor:
     assert torch.max(images) <= 1.0 and torch.min(images) >= 0.0, "Images are not in range [0, 1]"
@@ -23,21 +24,19 @@ def load_model(path, device):
 def save_model(model, path):
     torch.save(model, path)
 
-def create_save_directories(root_path, pgd_save_path):
+def create_save_directories(root_path):
     # create directory if it doesn't exist
     dir_path = os.path.join(root_path, dt.now().strftime("%Y-%m-%d_%H-%M-%S"))
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-    # create directory for pgd datasets if it doesn't exist
-    pgd_dir_path = None
-    if pgd_save_path is not None:
-        pgd_dir_path = os.path.join(dir_path, pgd_save_path)
-        if not os.path.exists(pgd_dir_path):
-            os.makedirs(pgd_dir_path)
-    return dir_path, pgd_dir_path
+    return dir_path
+
+def save_config_file(save_dir: str, filename: str):
+    config_save_path = os.path.join(save_dir, filename)
+    shutil.copyfile(filename, config_save_path)
 
 def plot_loss_history(metrics, save_path):
-    # Plot loss history
+    # Plot loss history over epochs
     plt.figure(figsize=(10, 5))
     plt.title("Loss history")
     plt.plot(metrics["train_loss"], label='train')
@@ -45,7 +44,17 @@ def plot_loss_history(metrics, save_path):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig(os.path.join(save_path, 'loss_history.png'))
+    plt.savefig(save_path)
+
+def plot_accuracy_history(metrics, save_path):
+    # Plot accuracy history over epochs
+    plt.figure(figsize=(10, 5))
+    plt.title("Accuracy history")
+    plt.plot(metrics, label='validation')
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.savefig(save_path)
 
 def set_compute_device():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
