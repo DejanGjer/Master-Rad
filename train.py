@@ -13,6 +13,7 @@ from resnet18 import ResNet18
 from dataset import cifar10_loader_resnet, transform_base_train, transform_base_test
 from utils import set_compute_device, create_save_directories, save_config_file
 from dataset import seed_worker
+from train_metrics import TrainMetrics, TestMetrics
 
 torch.manual_seed(config.seed)
 generator = torch.Generator().manual_seed(config.seed)
@@ -24,7 +25,7 @@ np.random.seed(config.seed)
 torch_generator = torch.Generator()
 torch_generator.manual_seed(config.seed)
 
-def train(model, device, train_loader, validation_loader, optimizer, epoch, loss_fn):
+def train(model, device, train_loader, validation_loader, optimizer, epoch, loss_fn, train_metrics=None):
     model.train()
     total_loss = 0
     for batch_idx, (data, target) in tqdm(enumerate(train_loader), total=len(train_loader)):
@@ -36,8 +37,11 @@ def train(model, device, train_loader, validation_loader, optimizer, epoch, loss
         total_loss += loss.item() * len(data)
         optimizer.step()
 
-    print(f"Epoch: {epoch}, Average Loss: {total_loss / len(train_loader.dataset):.6f}")
-    validate(model, device, validation_loader, loss_fn)
+    train_loss = total_loss / len(train_loader.dataset)
+    print(f"Epoch: {epoch}, Average Loss: {train_loss:.6f}")
+    validation_loss, validation_accuracy = validate(model, device, validation_loader, loss_fn)
+    if train_metrics:
+        train_metrics.update(train_loss, validation_loss, validation_accuracy)
             
 def validate(model, device, validation_loader, loss_fn):
     model.eval()
@@ -51,69 +55,77 @@ def validate(model, device, validation_loader, loss_fn):
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
     validation_loss /= len(validation_loader.dataset)
-    print(f"Validation set: Average loss: {validation_loss:.6f}, Accuracy: {correct}/{len(validation_loader.dataset)} ({100. * correct / len(validation_loader.dataset):.2f}%)")
+    accuracy = 100. * correct / len(validation_loader.dataset)
+    print(f"Validation set: Average loss: {validation_loss:.6f}, Accuracy: {correct}/{len(validation_loader.dataset)} ({accuracy:.2f}%)")
+    return validation_loss, accuracy
 
-def test(model, device, test_loader, loss_fn):
+def test(model, device, test_loader, loss_fn, test_metrics=None):
     model.eval()
     test_loss = 0
     correct = 0
-    index_store = []
     with torch.no_grad():
-        for i, (data, target) in enumerate(test_loader):
+        for i, (data, target) in tqdm(enumerate(test_loader), total=len(test_loader)):
             data, target = data.to(device), target.to(device)
             output = model(data)
             test_loss += loss_fn(output, target, reduction='sum').item()
             pred = output.argmax(dim=1, keepdim=True)
-            c = pred.eq(target.view_as(pred)).sum().item()
-            correct += c
-            index_store.append((i, c))
+            correct += pred.eq(target.view_as(pred)).sum().item()
+            
     unload_model(model)
-
     test_loss /= len(test_loader.dataset)
-
+    accuracy = 100. * correct / len(test_loader.dataset)
     print('[{}] Test set: Average loss: {:.6f}, Accuracy: {}/{} ({:.2f}%)'
           .format(model.net_type, test_loss, correct, len(test_loader.dataset),
                   100. * correct / len(test_loader.dataset)))
-    return index_store
+    if test_metrics:
+        test_metrics.update(model.net_type, test_loss, accuracy)
+
 
 def train_normal_model(save_dir, device, train_loader, validation_loader):
     model_normal_name = config.model_info["normal"]["model_path"]
     model_normal_path = os.path.join(save_dir, model_normal_name)
     if os.path.exists(model_normal_path):
+        print(f"Found existing checkpoint at {model_normal_path}. Skipping training.")
         return
     model_normal = ResNet18('normal').to(device)
     optimizer_normal = optim.SGD(filter(lambda p: p.requires_grad,
                                 model_normal.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_normal, milestones=config.milestones, gamma=0.1)
+    train_metrics = TrainMetrics("normal")
     for epoch in range(1, config.epochs + 1):
         train(model_normal, device, train_loader, validation_loader, optimizer_normal,
-            epoch, loss_fn=F.cross_entropy)
+            epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     model_normal.freeze()
     torch.save(model_normal, model_normal_path)
+    train_metrics.save_metrics_to_csv(save_dir)
     unload_model(model_normal)
 
 def train_negative_model(save_dir, device, train_loader, validation_loader):
     model_negative_name = config.model_info["negative"]["model_path"]
     model_negative_path = os.path.join(save_dir, model_negative_name)
     if os.path.exists(model_negative_path):
+        print(f"Found existing checkpoint at {model_negative_path}. Skipping training.")
         return
     model_negative = ResNet18('negative').to(device)
     optimizer_negative = optim.SGD(filter(lambda p: p.requires_grad,
                                 model_negative.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_negative, milestones=config.milestones, gamma=0.1)
+    train_metrics = TrainMetrics("negative")
     for epoch in range(1, config.epochs + 1):
         train(model_negative, device, train_loader, validation_loader, optimizer_negative,
-            epoch, loss_fn=F.cross_entropy)
+            epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     model_negative.freeze()
     torch.save(model_negative, model_negative_path)
+    train_metrics.save_metrics_to_csv(save_dir)
     unload_model(model_negative)
 
 def train_hybrid_nor_model(save_dir, device, train_loader, validation_loader, model_normal):
     model_hybrid_nor_name = config.model_info["hybrid_nor"]["model_path"]
     model_hybrid_nor_path = os.path.join(save_dir, model_hybrid_nor_name)
     if os.path.exists(model_hybrid_nor_path):
+        print(f"Found existing checkpoint at {model_hybrid_nor_path}. Skipping training.")
         return
     model_hybrid_nor = ResNet18('hybrid_nor').to(device)
     model_hybrid_nor.set_conv_layers_normal(model_normal.get_conv_layers_normal())
@@ -121,17 +133,20 @@ def train_hybrid_nor_model(save_dir, device, train_loader, validation_loader, mo
     optimizer_hybrid_nor = optim.SGD(filter(lambda p: p.requires_grad,
                                 model_hybrid_nor.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_nor, milestones=config.milestones, gamma=0.1)
+    train_metrics = TrainMetrics("hybrid_nor")
     for epoch in range(1, config.epochs + 1):
         train(model_hybrid_nor, device, train_loader, validation_loader, optimizer_hybrid_nor,
-            epoch, loss_fn=F.cross_entropy)
+            epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     torch.save(model_hybrid_nor, model_hybrid_nor_path)
+    train_metrics.save_metrics_to_csv(save_dir)
     unload_model(model_hybrid_nor)
 
 def train_hybrid_neg_model(save_dir, device, train_loader, validation_loader, model_negative):
     model_hybrid_neg_name = config.model_info["hybrid_neg"]["model_path"]
     model_hybrid_neg_path = os.path.join(save_dir, model_hybrid_neg_name)
     if os.path.exists(model_hybrid_neg_path):
+        print(f"Found existing checkpoint at {model_hybrid_neg_path}. Skipping training.")
         return
     model_hybrid_neg = ResNet18('hybrid_neg').to(device)
     model_hybrid_neg.set_conv_layers_negative(model_negative.get_conv_layers_negative())
@@ -139,17 +154,20 @@ def train_hybrid_neg_model(save_dir, device, train_loader, validation_loader, mo
     optimizer_hybrid_neg = optim.SGD(filter(lambda p: p.requires_grad,
                                 model_hybrid_neg.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_neg, milestones=config.milestones, gamma=0.1)
+    train_metrics = TrainMetrics("hybrid_neg")
     for epoch in range(1, config.epochs + 1):
         train(model_hybrid_neg, device, train_loader, validation_loader, optimizer_hybrid_neg,
-            epoch, loss_fn=F.cross_entropy)
+            epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     torch.save(model_hybrid_neg, model_hybrid_neg_path)
+    train_metrics.save_metrics_to_csv(save_dir)
     unload_model(model_hybrid_neg)
 
 def get_synergy_nor_model(save_dir, device, model_normal, model_hybrid_nor):
     model_synergy_nor_name = config.model_info["synergy_nor"]["model_path"]
     model_synergy_nor_path = os.path.join(save_dir, model_synergy_nor_name)
     if os.path.exists(model_synergy_nor_path):
+        print(f"Found existing checkpoint at {model_synergy_nor_path}. Skipping combining models.")
         return
     model_synergy_nor = ResNet18('synergy_nor').to(device)
     model_synergy_nor.set_conv_layers_normal(model_normal.get_conv_layers_normal())
@@ -163,6 +181,7 @@ def get_synergy_neg_model(save_dir, device, model_negative, model_hybrid_neg):
     model_synergy_neg_name = config.model_info["synergy_neg"]["model_path"]
     model_synergy_neg_path = os.path.join(save_dir, model_synergy_neg_name)
     if os.path.exists(model_synergy_neg_path):
+        print(f"Found existing checkpoint at {model_synergy_neg_path}. Skipping combining models.")
         return
     model_synergy_neg = ResNet18('synergy_neg').to(device)
     model_synergy_neg.set_conv_layers_negative(model_negative.get_conv_layers_negative())
@@ -176,6 +195,7 @@ def get_synergy_all_model(save_dir, device, model_normal, model_negative, model_
     model_synergy_all_name = config.model_info["synergy_all"]["model_path"]
     model_synergy_all_path = os.path.join(save_dir, model_synergy_all_name)
     if os.path.exists(model_synergy_all_path):
+        print(f"Found existing checkpoint at {model_synergy_all_path}. Skipping combining models.")
         return
     model_synergy_all = ResNet18('synergy_all').to(device)
     model_synergy_all.set_conv_layers_normal(model_normal.get_conv_layers_normal())
@@ -191,6 +211,7 @@ def train_tr_synergy_all_model(save_dir, device, train_loader, validation_loader
     model_tr_synergy_all_name = config.model_info["tr_synergy_all"]["model_path"]
     model_tr_synergy_all_path = os.path.join(save_dir, model_tr_synergy_all_name)
     if os.path.exists(model_tr_synergy_all_path):
+        print(f"Found existing checkpoint at {model_tr_synergy_all_path}. Skipping training.")
         return
     tr_synergy_all = ResNet18('tr_synergy_all').to(device)
     tr_synergy_all.set_conv_layers_normal(model_normal.get_conv_layers_normal())
@@ -199,11 +220,13 @@ def train_tr_synergy_all_model(save_dir, device, train_loader, validation_loader
     optimizer_tr_synergy_all = optim.SGD(filter(lambda p: p.requires_grad,
                                 tr_synergy_all.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_tr_synergy_all, milestones=config.milestones, gamma=0.1)
+    train_metrics = TrainMetrics("tr_synergy_all")
     for epoch in range(1, config.epochs + 1):
         train(tr_synergy_all, device, train_loader, validation_loader, optimizer_tr_synergy_all,
-            epoch, loss_fn=F.cross_entropy)
+            epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     torch.save(tr_synergy_all, model_tr_synergy_all_path)
+    train_metrics.save_metrics_to_csv(save_dir)
     unload_model(tr_synergy_all)
 
 def load_model(model_name, save_dir, device):
@@ -273,6 +296,7 @@ if __name__ == "__main__":
     model_tr_synergy_all = None
 
     model_info = config.model_info
+    test_metrics = TestMetrics(model_info)
 
     if model_info["normal"]["train"]:
         print("Training normal model...")
@@ -280,7 +304,7 @@ if __name__ == "__main__":
     if model_info["normal"]["test"]:
         print("Testing normal model...")
         model_normal = load_model("normal", save_dir, device)
-        test(model_normal, device, test_loader, loss_fn=F.cross_entropy)
+        test(model_normal, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
         
     if model_info["negative"]["train"]:
         print("Training negative model...")
@@ -288,7 +312,7 @@ if __name__ == "__main__":
     if model_info["negative"]["test"]:
         print("Testing negative model...")
         model_negative = load_model("negative", save_dir, device)
-        test(model_negative, device, test_loader, loss_fn=F.cross_entropy)
+        test(model_negative, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
 
     if model_info["hybrid_nor"]["train"]:
         print("Training hybrid normal model...")
@@ -298,7 +322,7 @@ if __name__ == "__main__":
     if model_info["hybrid_nor"]["test"]:
         print("Testing hybrid normal model...")
         model_hybrid_nor = load_model("hybrid_nor", save_dir, device)
-        test(model_hybrid_nor, device, test_loader, loss_fn=F.cross_entropy)
+        test(model_hybrid_nor, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
 
     if model_info["hybrid_neg"]["train"]:
         print("Training hybrid negative model...")
@@ -308,7 +332,7 @@ if __name__ == "__main__":
     if model_info["hybrid_neg"]["test"]:
         print("Testing hybrid negative model...")
         model_hybrid_neg = load_model("hybrid_neg", save_dir, device)
-        test(model_hybrid_neg, device, test_loader, loss_fn=F.cross_entropy)
+        test(model_hybrid_neg, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
 
     if model_info["synergy_nor"]["train"]:
         print("Training synergy normal model...")
@@ -320,7 +344,7 @@ if __name__ == "__main__":
     if model_info["synergy_nor"]["test"]:
         print("Testing synergy normal model...")
         model_synergy_nor = load_model("synergy_nor", save_dir, device)
-        test(model_synergy_nor, device, test_loader, loss_fn=F.cross_entropy)
+        test(model_synergy_nor, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
 
     if model_info["synergy_neg"]["train"]:
         print("Training synergy negative model...")
@@ -332,7 +356,7 @@ if __name__ == "__main__":
     if model_info["synergy_neg"]["test"]:
         print("Testing synergy negative model...")
         model_synergy_neg = load_model("synergy_neg", save_dir, device)
-        test(model_synergy_neg, device, test_loader, loss_fn=F.cross_entropy)
+        test(model_synergy_neg, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
 
     if model_info["synergy_all"]["train"]:
         print("Training synergy all model...")
@@ -348,7 +372,7 @@ if __name__ == "__main__":
     if model_info["synergy_all"]["test"]:
         print("Testing synergy all model...")
         model_synergy_all = load_model("synergy_all", save_dir, device)
-        test(model_synergy_all, device, test_loader, loss_fn=F.cross_entropy)
+        test(model_synergy_all, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
 
     if model_info["tr_synergy_all"]["train"]:
         print("Training tr synergy all model...")
@@ -360,4 +384,7 @@ if __name__ == "__main__":
     if model_info["tr_synergy_all"]["test"]:
         print("Testing tr synergy all model...")
         model_tr_synergy_all = load_model("tr_synergy_all", save_dir, device)
-        test(model_tr_synergy_all, device, test_loader, loss_fn=F.cross_entropy)
+        test(model_tr_synergy_all, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
+
+    test_metrics.save_metrics_to_csv(save_dir)
+    print("Training and testing completed. Metrics saved.")

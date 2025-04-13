@@ -1,5 +1,5 @@
-checkpoint_dir = 'checkpoints'
-create_new_saving_dir = True
+checkpoint_dir = 'checkpoints/2025-04-13_12-07-20'
+create_new_saving_dir = False
 seed = 42
 
 model_info = {
@@ -15,33 +15,33 @@ model_info = {
     },
     "hybrid_nor": {
         "model_path": "model_hybrid_nor.pth",
-        "train": True,
-        "test": True
+        "train": False,
+        "test": False
     },
     "hybrid_neg": {
         "model_path": "model_hybrid_neg.pth",
-        "train": True,
-        "test": True
+        "train": False,
+        "test": False
     },
     "synergy_nor": {
         "model_path": "model_synergy_nor.pth",
-        "train": True,
-        "test": True
+        "train": False,
+        "test": False
     },
     "synergy_neg": {
         "model_path": "model_synergy_neg.pth",
-        "train": True,
-        "test": True
+        "train": False,
+        "test": False
     },
     "synergy_all": {
         "model_path": "model_synergy_all.pth",
-        "train": True,
-        "test": True
+        "train": False,
+        "test": False
     },
     "tr_synergy_all": {
         "model_path": "model_tr_synergy_all.pth",
-        "train": True,
-        "test": True
+        "train": False,
+        "test": False
     }
 }
 
