@@ -83,7 +83,7 @@ def test(model, device, test_loader, loss_fn, test_metrics=None):
 
 def train_normal_model(save_dir, device, train_loader, validation_loader):
     model_normal_name = config.model_info["normal"]["model_path"]
-    model_normal_path = os.path.join(save_dir, model_normal_name)
+    model_normal_path = os.path.join(save_dir, config.checkpoint_dir, model_normal_name)
     if os.path.exists(model_normal_path):
         print(f"Found existing checkpoint at {model_normal_path}. Skipping training.")
         return
@@ -92,18 +92,20 @@ def train_normal_model(save_dir, device, train_loader, validation_loader):
                                 model_normal.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_normal, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("normal")
+    print("Training normal model...")
     for epoch in range(1, config.epochs + 1):
         train(model_normal, device, train_loader, validation_loader, optimizer_normal,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     model_normal.freeze()
     torch.save(model_normal, model_normal_path)
-    train_metrics.save_metrics_to_csv(save_dir)
+    train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
+    train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(model_normal)
 
 def train_negative_model(save_dir, device, train_loader, validation_loader):
     model_negative_name = config.model_info["negative"]["model_path"]
-    model_negative_path = os.path.join(save_dir, model_negative_name)
+    model_negative_path = os.path.join(save_dir, config.checkpoint_dir, model_negative_name)
     if os.path.exists(model_negative_path):
         print(f"Found existing checkpoint at {model_negative_path}. Skipping training.")
         return
@@ -112,18 +114,20 @@ def train_negative_model(save_dir, device, train_loader, validation_loader):
                                 model_negative.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_negative, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("negative")
+    print("Training negative model...")
     for epoch in range(1, config.epochs + 1):
         train(model_negative, device, train_loader, validation_loader, optimizer_negative,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     model_negative.freeze()
     torch.save(model_negative, model_negative_path)
-    train_metrics.save_metrics_to_csv(save_dir)
+    train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
+    train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(model_negative)
 
 def train_hybrid_nor_model(save_dir, device, train_loader, validation_loader, model_normal):
     model_hybrid_nor_name = config.model_info["hybrid_nor"]["model_path"]
-    model_hybrid_nor_path = os.path.join(save_dir, model_hybrid_nor_name)
+    model_hybrid_nor_path = os.path.join(save_dir, config.checkpoint_dir, model_hybrid_nor_name)
     if os.path.exists(model_hybrid_nor_path):
         print(f"Found existing checkpoint at {model_hybrid_nor_path}. Skipping training.")
         return
@@ -134,17 +138,19 @@ def train_hybrid_nor_model(save_dir, device, train_loader, validation_loader, mo
                                 model_hybrid_nor.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_nor, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("hybrid_nor")
+    print("Training hybrid normal model...")
     for epoch in range(1, config.epochs + 1):
         train(model_hybrid_nor, device, train_loader, validation_loader, optimizer_hybrid_nor,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     torch.save(model_hybrid_nor, model_hybrid_nor_path)
-    train_metrics.save_metrics_to_csv(save_dir)
+    train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
+    train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(model_hybrid_nor)
 
 def train_hybrid_neg_model(save_dir, device, train_loader, validation_loader, model_negative):
     model_hybrid_neg_name = config.model_info["hybrid_neg"]["model_path"]
-    model_hybrid_neg_path = os.path.join(save_dir, model_hybrid_neg_name)
+    model_hybrid_neg_path = os.path.join(save_dir, config.checkpoint_dir, model_hybrid_neg_name)
     if os.path.exists(model_hybrid_neg_path):
         print(f"Found existing checkpoint at {model_hybrid_neg_path}. Skipping training.")
         return
@@ -155,17 +161,19 @@ def train_hybrid_neg_model(save_dir, device, train_loader, validation_loader, mo
                                 model_hybrid_neg.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_neg, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("hybrid_neg")
+    print("Training hybrid negative model...")
     for epoch in range(1, config.epochs + 1):
         train(model_hybrid_neg, device, train_loader, validation_loader, optimizer_hybrid_neg,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     torch.save(model_hybrid_neg, model_hybrid_neg_path)
-    train_metrics.save_metrics_to_csv(save_dir)
+    train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
+    train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(model_hybrid_neg)
 
 def get_synergy_nor_model(save_dir, device, model_normal, model_hybrid_nor):
     model_synergy_nor_name = config.model_info["synergy_nor"]["model_path"]
-    model_synergy_nor_path = os.path.join(save_dir, model_synergy_nor_name)
+    model_synergy_nor_path = os.path.join(save_dir, config.checkpoint_dir, model_synergy_nor_name)
     if os.path.exists(model_synergy_nor_path):
         print(f"Found existing checkpoint at {model_synergy_nor_path}. Skipping combining models.")
         return
@@ -179,7 +187,7 @@ def get_synergy_nor_model(save_dir, device, model_normal, model_hybrid_nor):
 
 def get_synergy_neg_model(save_dir, device, model_negative, model_hybrid_neg):
     model_synergy_neg_name = config.model_info["synergy_neg"]["model_path"]
-    model_synergy_neg_path = os.path.join(save_dir, model_synergy_neg_name)
+    model_synergy_neg_path = os.path.join(save_dir, config.checkpoint_dir, model_synergy_neg_name)
     if os.path.exists(model_synergy_neg_path):
         print(f"Found existing checkpoint at {model_synergy_neg_path}. Skipping combining models.")
         return
@@ -193,7 +201,7 @@ def get_synergy_neg_model(save_dir, device, model_negative, model_hybrid_neg):
 
 def get_synergy_all_model(save_dir, device, model_normal, model_negative, model_hybrid_nor, model_hybrid_neg):
     model_synergy_all_name = config.model_info["synergy_all"]["model_path"]
-    model_synergy_all_path = os.path.join(save_dir, model_synergy_all_name)
+    model_synergy_all_path = os.path.join(save_dir, config.checkpoint_dir, model_synergy_all_name)
     if os.path.exists(model_synergy_all_path):
         print(f"Found existing checkpoint at {model_synergy_all_path}. Skipping combining models.")
         return
@@ -209,7 +217,7 @@ def get_synergy_all_model(save_dir, device, model_normal, model_negative, model_
 
 def train_tr_synergy_all_model(save_dir, device, train_loader, validation_loader, model_normal, model_negative):
     model_tr_synergy_all_name = config.model_info["tr_synergy_all"]["model_path"]
-    model_tr_synergy_all_path = os.path.join(save_dir, model_tr_synergy_all_name)
+    model_tr_synergy_all_path = os.path.join(save_dir, config.checkpoint_dir, model_tr_synergy_all_name)
     if os.path.exists(model_tr_synergy_all_path):
         print(f"Found existing checkpoint at {model_tr_synergy_all_path}. Skipping training.")
         return
@@ -221,16 +229,18 @@ def train_tr_synergy_all_model(save_dir, device, train_loader, validation_loader
                                 tr_synergy_all.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_tr_synergy_all, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("tr_synergy_all")
+    print("Training tr synergy all model...")
     for epoch in range(1, config.epochs + 1):
         train(tr_synergy_all, device, train_loader, validation_loader, optimizer_tr_synergy_all,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
     torch.save(tr_synergy_all, model_tr_synergy_all_path)
-    train_metrics.save_metrics_to_csv(save_dir)
+    train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
+    train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(tr_synergy_all)
 
 def load_model(model_name, save_dir, device):
-    model_path = os.path.join(save_dir, config.model_info[model_name]["model_path"])
+    model_path = os.path.join(save_dir, config.checkpoint_dir, config.model_info[model_name]["model_path"])
     if os.path.exists(model_path):
         return torch.load(model_path, weights_only=False).to(device)
     else:
@@ -280,9 +290,9 @@ if __name__ == "__main__":
 
     save_dir = None
     if config.create_new_saving_dir:
-        save_dir = create_save_directories(os.path.join(os.getcwd(), config.checkpoint_dir))
+        save_dir = create_save_directories(os.path.join(os.getcwd(), config.base_save_dir))
     else:
-        save_dir = os.path.join(os.getcwd(), config.checkpoint_dir)
+        save_dir = os.path.join(os.getcwd(), config.base_save_dir)
     save_config_file(save_dir, "config_train.py")
 
     train_loader, validation_loader, test_loader = create_datasets()
@@ -378,7 +388,7 @@ if __name__ == "__main__":
         print("Training tr synergy all model...")
         model_normal = load_model("normal", save_dir, device)
         model_negative = load_model("negative", save_dir, device)
-        train_tr_synergy_all_model(save_dir, device, model_normal, model_negative)
+        train_tr_synergy_all_model(save_dir, device, train_loader, validation_loader, model_normal, model_negative)
         unload_model(model_normal)
         unload_model(model_negative)
     if model_info["tr_synergy_all"]["test"]:
@@ -386,5 +396,5 @@ if __name__ == "__main__":
         model_tr_synergy_all = load_model("tr_synergy_all", save_dir, device)
         test(model_tr_synergy_all, device, test_loader, loss_fn=F.cross_entropy, test_metrics=test_metrics)
 
-    test_metrics.save_metrics_to_csv(save_dir)
+    test_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
     print("Training and testing completed. Metrics saved.")

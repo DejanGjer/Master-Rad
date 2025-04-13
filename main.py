@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     save_dir = create_save_directories(config.save_root_path)
     save_model(model, os.path.join(save_dir, 'unet_denoiser.pt'))
-    plot_loss_history(metrics, save_dir)
+    plot_loss_history(metrics, os.path.join(save_dir, 'loss_history.png'))
     # convert metrics to pandas dataframe and save it
     metrics = pd.DataFrame(metrics)
     metrics.to_csv(os.path.join(save_dir, 'losses.csv'), index=False)

@@ -1,5 +1,8 @@
-checkpoint_dir = 'checkpoints/2025-04-13_12-07-20'
-create_new_saving_dir = False
+base_save_dir = 'base_training_checkpoints'
+checkpoint_dir = 'checkpoints'
+plot_dir = 'plots'
+metrics_dir = 'metrics'
+create_new_saving_dir = True
 seed = 42
 
 model_info = {
@@ -15,33 +18,33 @@ model_info = {
     },
     "hybrid_nor": {
         "model_path": "model_hybrid_nor.pth",
-        "train": False,
-        "test": False
+        "train": True,
+        "test": True
     },
     "hybrid_neg": {
         "model_path": "model_hybrid_neg.pth",
-        "train": False,
-        "test": False
+        "train": True,
+        "test": True
     },
     "synergy_nor": {
         "model_path": "model_synergy_nor.pth",
-        "train": False,
-        "test": False
+        "train": True,
+        "test": True
     },
     "synergy_neg": {
         "model_path": "model_synergy_neg.pth",
-        "train": False,
-        "test": False
+        "train": True,
+        "test": True
     },
     "synergy_all": {
         "model_path": "model_synergy_all.pth",
-        "train": False,
-        "test": False
+        "train": True,
+        "test": True
     },
     "tr_synergy_all": {
         "model_path": "model_tr_synergy_all.pth",
-        "train": False,
-        "test": False
+        "train": True,
+        "test": True
     }
 }
 

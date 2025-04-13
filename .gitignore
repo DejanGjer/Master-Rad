@@ -62,6 +62,7 @@ env_gpu/
 __pycache__/
 
 # Ignore model weights
+base_training_checkpoints/
 checkpoints/
 original_models/
 *.pt

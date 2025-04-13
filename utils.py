@@ -36,7 +36,7 @@ def save_config_file(save_dir: str, filename: str):
     shutil.copyfile(filename, config_save_path)
 
 def plot_loss_history(metrics, save_path):
-    # Plot loss history
+    # Plot loss history over epochs
     plt.figure(figsize=(10, 5))
     plt.title("Loss history")
     plt.plot(metrics["train_loss"], label='train')
@@ -44,7 +44,17 @@ def plot_loss_history(metrics, save_path):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig(os.path.join(save_path, 'loss_history.png'))
+    plt.savefig(save_path)
+
+def plot_accuracy_history(metrics, save_path):
+    # Plot accuracy history over epochs
+    plt.figure(figsize=(10, 5))
+    plt.title("Accuracy history")
+    plt.plot(metrics, label='validation')
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.savefig(save_path)
 
 def set_compute_device():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

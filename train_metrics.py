@@ -1,6 +1,9 @@
 import os
 
 import pandas as pd
+import matplotlib.pyplot as plt
+
+from utils import plot_loss_history, plot_accuracy_history
 
 class TrainMetrics:
     def __init__(self, model_name):
@@ -27,6 +30,18 @@ class TrainMetrics:
         save_path = os.path.join(save_dir, f"train_metrics_{self.model_name}.csv")
         metrics_df.to_csv(save_path, index=False)
         print(f"Metrics saved to {save_path}")
+
+    def plot_metrics(self, save_dir):
+        # plot loss history
+        loss_save_path = os.path.join(save_dir, f"loss_history_{self.model_name}.png")
+        plot_loss_history({
+            "train_loss": self.train_loss_history,
+            "validation_loss": self.val_loss_history
+        }, loss_save_path)
+        print(f"Loss history plot saved to {loss_save_path}")
+        accuracy_save_path = os.path.join(save_dir, f"accuracy_history_{self.model_name}.png")
+        plot_accuracy_history(self.val_loss_accuracy, accuracy_save_path)
+        print(f"Accuracy history plot saved to {accuracy_save_path}")
 
 
 class TestMetrics:
@@ -60,3 +75,4 @@ class TestMetrics:
         save_path = os.path.join(save_dir, "test_metrics.csv")
         metrics_df.to_csv(save_path, index=False)
         print(f"Test metrics saved to {save_path}")
+        
