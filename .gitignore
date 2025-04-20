@@ -71,3 +71,6 @@ original_models/
 
 # Ignore downloaded datasets
 data/
+
+# VSCode files
+.vscode/

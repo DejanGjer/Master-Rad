@@ -22,6 +22,8 @@ class BaseDataset(Dataset):
         self.torch_generator = torch_generator
         self.sample_percent = sample_percent
         self.__set_image_size()
+        self.__set_num_channels()
+        self.__set_num_classes()
         self.__download_dataset()
         self.__split_dataset()
         if self.sample_percent is not None:
@@ -35,6 +37,22 @@ class BaseDataset(Dataset):
             self.image_size = 28
         elif self.dataset_name == "imagenette":
             self.image_size = 224
+        else:
+            raise ValueError(f"Dataset {self.dataset_name} not supported. Supported datasets: {self.DATASETS}")
+        
+    def __set_num_classes(self):
+        if self.dataset_name in ["cifar10", "mnist", "imagenette"]:
+            self.num_classes = 10
+        elif self.dataset_name == "cifar100":
+            self.num_classes = 100
+        else:
+            raise ValueError(f"Dataset {self.dataset_name} not supported. Supported datasets: {self.DATASETS}")
+        
+    def __set_num_channels(self):
+        if self.dataset_name in ["cifar10", "cifar100", "imagenette"]:
+            self.num_channels = 3
+        elif self.dataset_name == "mnist":
+            self.num_channels = 1
         else:
             raise ValueError(f"Dataset {self.dataset_name} not supported. Supported datasets: {self.DATASETS}")
 
@@ -91,6 +109,7 @@ class BaseDataset(Dataset):
             raise ValueError(f"Dataset {self.dataset_name} not supported. Supported datasets: {self.DATASETS}")
 
     def __download_dataset(self):
+        print("Getting/downloading dataset...")
         if self.dataset_name == "cifar10":
             self.train_dataset = datasets.CIFAR10('./data', download=True, train=True, transform=self.__get_train_transforms())
             self.validation_dataset = datasets.CIFAR10('./data', download=True, train=True, transform=self.__get_test_transforms())
@@ -130,11 +149,25 @@ class BaseDataset(Dataset):
         self.train_dataset = Subset(self.train_dataset, train_indices)
         self.validation_dataset = Subset(self.validation_dataset, val_indices)
 
-    def get_dataloaders(self):
-        train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=self.torch_generator)
-        validation_loader = DataLoader(self.validation_dataset, batch_size=self.batch_size, shuffle=False, worker_init_fn=seed_worker, generator=self.torch_generator)
-        test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, worker_init_fn=seed_worker, generator=self.torch_generator)
-        return train_loader, validation_loader, test_loader
+    def create_dataloaders(self):
+        self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=self.torch_generator)
+        self.validation_loader = DataLoader(self.validation_dataset, batch_size=self.batch_size, shuffle=False, worker_init_fn=seed_worker, generator=self.torch_generator)
+        self.test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, worker_init_fn=seed_worker, generator=self.torch_generator)
+    
+    def get_train_dataloader(self):
+        if self.train_loader is None:
+            raise ValueError("Dataloaders not created. Call create_dataloaders() first.")
+        return self.train_loader
+    
+    def get_validation_dataloader(self):
+        if self.validation_loader is None:
+            raise ValueError("Dataloaders not created. Call create_dataloaders() first.")
+        return self.validation_loader
+    
+    def get_test_dataloader(self):
+        if self.test_loader is None:
+            raise ValueError("Dataloaders not created. Call create_dataloaders() first.")
+        return self.test_loader
 
     def log_dataset_info(self):
         print(f"Dataset: {self.dataset_name}")
@@ -142,6 +175,7 @@ class BaseDataset(Dataset):
         print(f"Validation dataset size: {len(self.validation_dataset)}")
         print(f"Test dataset size: {len(self.test_dataset)}")
         print(f"Image size: {self.image_size}x{self.image_size}")
+        print(f"Number of classes: {self.num_classes}")
         print(f"Normalization: {self.normalize}")
 
 class AttackDataset(Dataset):

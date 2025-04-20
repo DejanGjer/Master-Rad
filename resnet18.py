@@ -31,14 +31,13 @@ class BasicBlock(nn.Module):
     
     
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, net_type, num_classes=10):
+    def __init__(self, block, num_blocks, net_type, num_in_channels=3, num_classes=10):
         super(ResNet, self).__init__()
         self.in_planes = 64
-
         self.net_type = net_type
 
         if ('normal' in self.net_type) or ('hybrid_nor' in self.net_type) or ('synergy_nor' in self.net_type) or ('synergy_all' in self.net_type):
-           self.conv1_normal = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+           self.conv1_normal = nn.Conv2d(num_in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
            self.bn1_normal = nn.BatchNorm2d(64)
            self.layer1_normal = self._make_layer(block, 64, num_blocks[0], stride=1)
            self.layer2_normal = self._make_layer(block, 128, num_blocks[1], stride=2)
@@ -46,7 +45,7 @@ class ResNet(nn.Module):
            self.layer4_normal = self._make_layer(block, 512, num_blocks[3], stride=2)
 
         if ('negative' in self.net_type) or ('hybrid_neg' in self.net_type) or ('synergy_neg' in self.net_type) or ('synergy_all' in self.net_type):
-           self.conv1_negative = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+           self.conv1_negative = nn.Conv2d(num_in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
            self.bn1_negative = nn.BatchNorm2d(64)
            self.layer1_negative = self._make_layer(block, 64, num_blocks[0], stride=1)
            self.layer2_negative = self._make_layer(block, 128, num_blocks[1], stride=2)
@@ -185,6 +184,6 @@ class DataParallelPassthrough(torch.nn.DataParallel):
         except AttributeError:
             return getattr(self.module, name)
 
-def ResNet18(net_type):
-    return ResNet(BasicBlock, [2,2,2,2], net_type)
+def ResNet18(net_type, num_in_channels, num_classes):
+    return ResNet(BasicBlock, [2,2,2,2], net_type, num_in_channels, num_classes)
 
