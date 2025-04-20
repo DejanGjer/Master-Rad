@@ -22,6 +22,7 @@ class TrainMetrics:
         if not self.train_loss_history or not self.val_loss_history or not self.val_loss_accuracy:
             print("No metrics to save.")
             return
+        os.makedirs(save_dir, exist_ok=True)
         metrics_df = pd.DataFrame({
             'train_loss': self.train_loss_history,
             'val_loss': self.val_loss_history,
@@ -34,6 +35,7 @@ class TrainMetrics:
     def plot_metrics(self, save_dir):
         # plot loss history
         loss_save_path = os.path.join(save_dir, f"loss_history_{self.model_name}.png")
+        os.makedirs(save_dir, exist_ok=True)
         plot_loss_history({
             "train_loss": self.train_loss_history,
             "validation_loss": self.val_loss_history

@@ -89,6 +89,7 @@ class FGSMAttack(Attack):
         assert part_size > 0, "Too many epsilons for the dataset size"
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
             part = i // part_size if i // part_size < len(self.epsilons) else i % len(self.epsilons)
+            print(f"Min: {data.min()}, Max: {data.max()}")
             perturbed_data = fgsm_attacks[part](data, target)
             perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
             data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)

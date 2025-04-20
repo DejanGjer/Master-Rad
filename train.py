@@ -12,7 +12,7 @@ import config_train as config
 from resnet18 import ResNet18
 from dataset import cifar10_loader_resnet, transform_base_train, transform_base_test
 from utils import set_compute_device, create_save_directories, save_config_file
-from dataset import seed_worker
+from dataset import seed_worker, BaseDataset
 from train_metrics import TrainMetrics, TestMetrics
 
 torch.manual_seed(config.seed)
@@ -87,12 +87,13 @@ def train_normal_model(save_dir, device, train_loader, validation_loader):
     if os.path.exists(model_normal_path):
         print(f"Found existing checkpoint at {model_normal_path}. Skipping training.")
         return
+    else:
+        os.makedirs(os.path.join(save_dir, config.checkpoint_dir), exist_ok=True)
     model_normal = ResNet18('normal').to(device)
     optimizer_normal = optim.SGD(filter(lambda p: p.requires_grad,
                                 model_normal.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_normal, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("normal")
-    print("Training normal model...")
     for epoch in range(1, config.epochs + 1):
         train(model_normal, device, train_loader, validation_loader, optimizer_normal,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
@@ -114,7 +115,6 @@ def train_negative_model(save_dir, device, train_loader, validation_loader):
                                 model_negative.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_negative, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("negative")
-    print("Training negative model...")
     for epoch in range(1, config.epochs + 1):
         train(model_negative, device, train_loader, validation_loader, optimizer_negative,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
@@ -138,7 +138,6 @@ def train_hybrid_nor_model(save_dir, device, train_loader, validation_loader, mo
                                 model_hybrid_nor.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_nor, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("hybrid_nor")
-    print("Training hybrid normal model...")
     for epoch in range(1, config.epochs + 1):
         train(model_hybrid_nor, device, train_loader, validation_loader, optimizer_hybrid_nor,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
@@ -161,7 +160,6 @@ def train_hybrid_neg_model(save_dir, device, train_loader, validation_loader, mo
                                 model_hybrid_neg.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_neg, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("hybrid_neg")
-    print("Training hybrid negative model...")
     for epoch in range(1, config.epochs + 1):
         train(model_hybrid_neg, device, train_loader, validation_loader, optimizer_hybrid_neg,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
@@ -229,7 +227,6 @@ def train_tr_synergy_all_model(save_dir, device, train_loader, validation_loader
                                 tr_synergy_all.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_tr_synergy_all, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("tr_synergy_all")
-    print("Training tr synergy all model...")
     for epoch in range(1, config.epochs + 1):
         train(tr_synergy_all, device, train_loader, validation_loader, optimizer_tr_synergy_all,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
@@ -251,24 +248,27 @@ def unload_model(model):
     torch.cuda.empty_cache()
 
 def create_datasets():
-    loader = cifar10_loader_resnet
-    train_loader = loader(device, config.batch_size, transform_base_train, torch_generator=torch_generator, train=True)
-    test_loader = loader(device, config.batch_size, transform_base_test, torch_generator=torch_generator)
-    # split training dataset into training and validation
-    train_dataset, validation_dataset = random_split(train_loader.dataset, 
-                                                    [config.train_split, config.validation_split],
-                                                    generator=torch_generator)
-    train_loader = torch.utils.data.DataLoader(train_dataset, 
-                                               batch_size=config.batch_size, 
-                                               shuffle=True, 
-                                               worker_init_fn=seed_worker, 
-                                               generator=torch_generator)
-    validation_loader = torch.utils.data.DataLoader(validation_dataset, 
-                                                    batch_size=config.batch_size, 
-                                                    shuffle=False, 
-                                                    worker_init_fn=seed_worker, 
-                                                    generator=torch_generator)
-    return train_loader, validation_loader, test_loader
+    dataset = BaseDataset(config.dataset_name, config.batch_size, config.train_split, 
+                          normalize=False, torch_generator=torch_generator, sample_percent=config.sample_percent)
+    return dataset.get_dataloaders()
+    # loader = cifar10_loader_resnet
+    # train_loader = loader(device, config.batch_size, transform_base_train, torch_generator=torch_generator, train=True)
+    # test_loader = loader(device, config.batch_size, transform_base_test, torch_generator=torch_generator)
+    # # split training dataset into training and validation
+    # train_dataset, validation_dataset = random_split(train_loader.dataset, 
+    #                                                 [config.train_split, config.validation_split],
+    #                                                 generator=torch_generator)
+    # train_loader = torch.utils.data.DataLoader(train_dataset, 
+    #                                            batch_size=config.batch_size, 
+    #                                            shuffle=True, 
+    #                                            worker_init_fn=seed_worker, 
+    #                                            generator=torch_generator)
+    # validation_loader = torch.utils.data.DataLoader(validation_dataset, 
+    #                                                 batch_size=config.batch_size, 
+    #                                                 shuffle=False, 
+    #                                                 worker_init_fn=seed_worker, 
+    #                                                 generator=torch_generator)
+    # return train_loader, validation_loader, test_loader
 
 
 def print_training_info(device):
