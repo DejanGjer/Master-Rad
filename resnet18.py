@@ -81,7 +81,7 @@ class ResNet(nn.Module):
            out_normal = self.layer2_normal(out_normal)
            out_normal = self.layer3_normal(out_normal)
            out_normal = self.layer4_normal(out_normal)
-           out_normal = F.avg_pool2d(out_normal, 4)
+           out_normal = F.adaptive_avg_pool2d(out_normal, (1, 1))
            out_normal = out_normal.view(out_normal.size(0), -1)
 
         if ('negative' in self.net_type) or ('hybrid_neg' in self.net_type) or ('synergy_neg' in self.net_type) or ('synergy_all' in self.net_type):
@@ -90,7 +90,7 @@ class ResNet(nn.Module):
            out_negative = self.layer2_negative(out_negative)
            out_negative = self.layer3_negative(out_negative)
            out_negative = self.layer4_negative(out_negative)
-           out_negative = F.avg_pool2d(out_negative, 4)
+           out_negative = F.adaptive_avg_pool2d(out_negative, (1, 1))
            out_negative = out_negative.view(out_negative.size(0), -1)
 
         # fc block:
