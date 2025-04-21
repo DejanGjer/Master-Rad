@@ -1,4 +1,6 @@
-# data splits
+# dataset
+dataset_name = 'cifar100' # cifar10, cifar100, mnist, imagenette
+sample_percent = 0.1 # None for all data, 0.1 for 10% of the data, etc.
 train_split = 0.8 
 validation_split = 0.2 # test set is loaded separately  
 
@@ -58,14 +60,14 @@ train_model_paths = [
     './original_models/model_normal.pt',
 ]
 test_model_paths = [
-    './original_models/model_normal.pt',
-    './original_models/model_negative.pt',
-    './original_models/model_hybrid_nor.pt',
-    './original_models/model_hybrid_neg.pt',
-    './original_models/model_synergy_nor.pt',
-    './original_models/model_synergy_neg.pt',
-    './original_models/model_synergy_all.pt',
-    './original_models/model_tr_synergy_all.pt'
+    '.\base_training_checkpoints\2025-04-21_09-03-11\checkpoints\model_normal.pt',
+    '.\base_training_checkpoints\2025-04-21_09-03-11\checkpoints\model_negative.pt',
+    '.\base_training_checkpoints\2025-04-21_09-03-11\checkpoints\model_hybrid_nor.pt',
+    '.\base_training_checkpoints\2025-04-21_09-03-11\checkpoints\model_hybrid_neg.pt',
+    '.\base_training_checkpoints\2025-04-21_09-03-11\checkpoints\model_synergy_nor.pt',
+    '.\base_training_checkpoints\2025-04-21_09-03-11\checkpoints\model_synergy_neg.pt',
+    '.\base_training_checkpoints\2025-04-21_09-03-11\checkpoints\model_synergy_all.pt',
+    '.\base_training_checkpoints\2025-04-21_09-03-11\checkpoints\model_tr_synergy_all.pt'
 ]
 
 # saving paths

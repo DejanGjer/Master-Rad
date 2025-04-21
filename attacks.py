@@ -10,15 +10,15 @@ from torch.utils.data import DataLoader
 from torchattacks import PGD, FGSM, RFGSM, OnePixel, Pixle, Square
 from tqdm import tqdm
 import pandas as pd
-from tabulate import tabulate
 import math
 
 from dataset import CIFAR10_MEAN, CIFAR10_STD
 from utils import normalize_images
 
 class Attack(ABC):
-    def __init__(self, name: str):
+    def __init__(self, name: str, dataset_params: dict):
         self.name = name
+        self.dataset_params = dataset_params
 
     @abstractmethod
     def run_attack(self, model: nn.Module, dataloader: DataLoader, **kwargs) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
@@ -77,8 +77,8 @@ class Attack(ABC):
         return self.name
 
 class FGSMAttack(Attack):
-    def __init__(self, name, epsilons):
-        super().__init__(name)
+    def __init__(self, name, dataset_params, epsilons):
+        super().__init__(name, dataset_params)
         self.epsilons = epsilons
 
     def run_attack(self, model, dataloader):
@@ -89,10 +89,9 @@ class FGSMAttack(Attack):
         assert part_size > 0, "Too many epsilons for the dataset size"
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
             part = i // part_size if i // part_size < len(self.epsilons) else i % len(self.epsilons)
-            print(f"Min: {data.min()}, Max: {data.max()}")
             perturbed_data = fgsm_attacks[part](data, target)
-            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            perturbed_data = normalize_images(perturbed_data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            data = normalize_images(data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             adv_images.extend(perturbed_data)
             org_images.extend(data)
         return adv_images, org_images
@@ -106,7 +105,7 @@ class FGSMAttack(Attack):
         print(f"Testing {model.net_type} with FGSM attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = fgsm_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -117,8 +116,8 @@ class FGSMAttack(Attack):
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
     
 class RFGSMAttack(Attack):
-    def __init__(self, name, epsilons, alpha, steps):
-        super().__init__(name)
+    def __init__(self, name, dataset_params, epsilons, alpha, steps):
+        super().__init__(name, dataset_params)
         self.epsilons = epsilons
         self.alpha = alpha
         self.steps = steps
@@ -132,8 +131,8 @@ class RFGSMAttack(Attack):
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
             part = i // part_size if i // part_size < len(self.epsilons) else i % len(self.epsilons)
             perturbed_data = rfgsm_attacks[part](data, target)
-            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            perturbed_data = normalize_images(perturbed_data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            data = normalize_images(data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             adv_images.extend(perturbed_data)
             org_images.extend(data)
         return adv_images, org_images
@@ -147,7 +146,7 @@ class RFGSMAttack(Attack):
         print(f"Testing {model.net_type} with RFGSM attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = rfgsm_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -158,8 +157,8 @@ class RFGSMAttack(Attack):
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
 
 class PGDAttack(Attack):
-    def __init__(self, name, epsilons, alpha, steps):
-        super().__init__(name)
+    def __init__(self, name, dataset_params, epsilons, alpha, steps):
+        super().__init__(name, dataset_params)
         self.epsilons = epsilons
         self.alpha = alpha
         self.steps = steps
@@ -173,8 +172,8 @@ class PGDAttack(Attack):
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
             part = i // part_size if i // part_size < len(self.epsilons) else i % len(self.epsilons) 
             perturbed_data = pgd_attacks[part](data, target)
-            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            perturbed_data = normalize_images(perturbed_data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            data = normalize_images(data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             adv_images.extend(perturbed_data)
             org_images.extend(data)
         return adv_images, org_images
@@ -183,14 +182,12 @@ class PGDAttack(Attack):
         # rename the epsilons argument (which has to have same name as the class attribute) to epsilon
         epsilon=epsilons
         pgd_attack = PGD(model, eps=epsilon, alpha=self.alpha, steps=self.steps)
-        # dataset_save_path = os.path.join(dataset_save_path, f"pgd_test_{model.net_type}_{int(epsilon * 100)}.pt")
-        # pgd_attack.save(data_loader=dataloader, save_path=dataset_save_path, verbose=False, save_type='int')
         model.eval()
         correct = 0
         print(f"Testing {model.net_type} with PGD attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = pgd_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -201,8 +198,8 @@ class PGDAttack(Attack):
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
     
 class OnePixelAttack(Attack):
-    def __init__(self, name, pixel_counts, steps, popsize, batch_size):
-        super().__init__(name)
+    def __init__(self, name, dataset_params, pixel_counts, steps, popsize, batch_size):
+        super().__init__(name, dataset_params)
         self.pixel_counts = pixel_counts
         self.steps = steps
         self.popsize = popsize
@@ -217,8 +214,8 @@ class OnePixelAttack(Attack):
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
             part = i // part_size if i // part_size < len(self.pixel_counts) else i % len(self.pixel_counts)
             perturbed_data = one_pixel_attacks[part](data, target)
-            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            perturbed_data = normalize_images(perturbed_data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            data = normalize_images(data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             adv_images.extend(perturbed_data)
             org_images.extend(data)
         return adv_images, org_images
@@ -232,7 +229,7 @@ class OnePixelAttack(Attack):
         print(f"Testing {model.net_type} with OnePixel attack with pixel count = {pixel_count}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = one_pixel_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -243,8 +240,9 @@ class OnePixelAttack(Attack):
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, pixel_count=pixel_count)
     
 class PixleAttack(Attack):
-    def __init__(self, name, x_dimensions, y_dimensions, pixel_mapping, restarts, max_iterations, update_each_iteration):
-        super().__init__(name)
+    def __init__(self, name, dataset_params, x_dimensions, y_dimensions, pixel_mapping, 
+                 restarts, max_iterations, update_each_iteration):
+        super().__init__(name, dataset_params)
         self.x_dimensions = x_dimensions
         self.y_dimensions = y_dimensions
         self.pixel_mapping = pixel_mapping
@@ -260,8 +258,8 @@ class PixleAttack(Attack):
         adv_images, org_images = [], []
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
             perturbed_data = pixle_attacks[0](data, target)
-            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            perturbed_data = normalize_images(perturbed_data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            data = normalize_images(data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             adv_images.extend(perturbed_data)
             org_images.extend(data)
         return adv_images, org_images
@@ -275,7 +273,7 @@ class PixleAttack(Attack):
         print(f"Testing {model.net_type} with Pixle attack, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = pixle_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -286,8 +284,8 @@ class PixleAttack(Attack):
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model)
     
 class SquareAttack(Attack):
-    def __init__(self, name, norm, epsilons, n_queries, n_restarts, p_init, loss, resc_schedule, seed):
-        super().__init__(name)
+    def __init__(self, name, dataset_params, norm, epsilons, n_queries, n_restarts, p_init, loss, resc_schedule, seed):
+        super().__init__(name, dataset_params)
         self.norm = norm
         self.epsilons = epsilons
         self.n_queries = n_queries
@@ -307,8 +305,8 @@ class SquareAttack(Attack):
         for i, (data, target) in enumerate(tqdm(dataloader, total=len(dataloader))):
             part = i // part_size if i // part_size < len(self.epsilons) else i % len(self.epsilons)
             perturbed_data = square_attacks[part](data, target)
-            perturbed_data = normalize_images(perturbed_data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
-            data = normalize_images(data, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            perturbed_data = normalize_images(perturbed_data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            data = normalize_images(data, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             adv_images.extend(perturbed_data)
             org_images.extend(data)
         return adv_images, org_images
@@ -323,7 +321,7 @@ class SquareAttack(Attack):
         print(f"Testing {model.net_type} with Square attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = square_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=CIFAR10_MEAN, std=CIFAR10_STD)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)

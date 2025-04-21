@@ -10,7 +10,7 @@ CIFAR10_MEAN = [0.4914, 0.4822, 0.4465]
 CIFAR10_STD = [0.2023, 0.1994, 0.2010]
 SEED = 42
 
-class BaseDataset(Dataset):
+class BaseDataset:
     DATASETS = ["cifar10", "cifar100", "mnist", "imagenette"]
 
     def __init__(self, dataset_name, batch_size, train_split, normalize, torch_generator, sample_percent=None):
@@ -56,7 +56,7 @@ class BaseDataset(Dataset):
         else:
             raise ValueError(f"Dataset {self.dataset_name} not supported. Supported datasets: {self.DATASETS}")
 
-    def __get_normalization_params(self):
+    def get_normalization_params(self):
         if self.dataset_name == "cifar10":
             return [0.4914, 0.4822, 0.4465], [0.2023, 0.1994, 0.2010]
         elif self.dataset_name == "cifar100":
@@ -74,20 +74,20 @@ class BaseDataset(Dataset):
                 transforms.RandomCrop(self.image_size, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor()] +
-                ([transforms.Normalize(*self.__get_normalization_params())] if self.normalize else [])
+                ([transforms.Normalize(*self.get_normalization_params())] if self.normalize else [])
             )
         elif self.dataset_name == "mnist":
             return transforms.Compose([
                 transforms.RandomCrop(self.image_size, padding=4),
                 transforms.ToTensor()] +
-                ([transforms.Normalize(*self.__get_normalization_params())] if self.normalize else [])
+                ([transforms.Normalize(*self.get_normalization_params())] if self.normalize else [])
             )
         elif self.dataset_name == "imagenette":
             return transforms.Compose([
                 transforms.RandomResizedCrop(self.image_size),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor()] +
-                ([transforms.Normalize(*self.__get_normalization_params())] if self.normalize else [])
+                ([transforms.Normalize(*self.get_normalization_params())] if self.normalize else [])
             )
         else:
             raise ValueError(f"Dataset {self.dataset_name} not supported. Supported datasets: {self.DATASETS}")
@@ -96,14 +96,14 @@ class BaseDataset(Dataset):
         if self.dataset_name in ["cifar10", "cifar100", "mnist"]:
             return transforms.Compose([
                 transforms.ToTensor()] +
-                ([transforms.Normalize(*self.__get_normalization_params())] if self.normalize else [])
+                ([transforms.Normalize(*self.get_normalization_params())] if self.normalize else [])
             )
         elif self.dataset_name == "imagenette":
             return transforms.Compose([
                 transforms.Resize(256),
                 transforms.CenterCrop(self.image_size),
                 transforms.ToTensor()] +
-                ([transforms.Normalize(*self.__get_normalization_params())] if self.normalize else [])
+                ([transforms.Normalize(*self.get_normalization_params())] if self.normalize else [])
             )
         else:
             raise ValueError(f"Dataset {self.dataset_name} not supported. Supported datasets: {self.DATASETS}")
@@ -236,5 +236,4 @@ def cifar10_loader_resnet(device, batch_size, transform, torch_generator, train=
         random_indices = random.sample(range(len(dataset)), num_samples)
         dataset = Subset(dataset, random_indices)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train, worker_init_fn=seed_worker, generator=torch_generator)
-    print(f"Min: {dataloader.dataset.data.min()}, Max: {dataloader.dataset.data.max()}")
     return dataloader
