@@ -68,3 +68,9 @@ original_models/
 *.pt
 *.pth
 *.h5
+
+# Ignore downloaded datasets
+data/
+
+# VSCode files
+.vscode/

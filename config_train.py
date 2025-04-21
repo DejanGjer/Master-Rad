@@ -48,13 +48,15 @@ model_info = {
     }
 }
 
-# data splits
+# dataset
+dataset_name = 'imagenette' # cifar10, cifar100, mnist, imagenette
+sample_percent = None # None for all data, 0.1 for 10% of the data, etc.
 train_split = 0.8 
 validation_split = 0.2 # test set is loaded separately 
 
 learning_rate = 0.1
 momentum = 0.9
 decay = 5e-3
-epochs = 50
-batch_size = 768
+epochs = 20
+batch_size = 32
 milestones = [30, 40]

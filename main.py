@@ -11,7 +11,7 @@ import pandas as pd
 import config
 from resnet18 import ResNet, BasicBlock
 from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device, save_config_file
-from dataset import cifar10_loader_resnet, transform_train, transform_test, AttackDataset
+from dataset import cifar10_loader_resnet, transform_train, transform_test, AttackDataset, BaseDataset, seed_worker
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
 
@@ -27,47 +27,52 @@ np.random.seed(42)
 torch_generator = torch.Generator()
 torch_generator.manual_seed(config.seed)
 
-def create_attack(attack_type, attack_params) -> Attack:
+def create_attack(attack_type, dataset_params, attack_params) -> Attack:
     if attack_type == "fgsm":
-        return FGSMAttack("FGSM", **attack_params["fgsm"])
+        return FGSMAttack("FGSM", dataset_params, **attack_params["fgsm"])
     elif attack_type == "rfgsm":
-        return RFGSMAttack("RFGSM", **attack_params["rfgsm"])
+        return RFGSMAttack("RFGSM", dataset_params, **attack_params["rfgsm"])
     elif attack_type == "pgd":
-        return PGDAttack("PGD", **attack_params["pgd"])
+        return PGDAttack("PGD", dataset_params, **attack_params["pgd"])
     elif attack_type == "one_pixel":
-        return OnePixelAttack("OnePixel", **attack_params["one_pixel"])
+        return OnePixelAttack("OnePixel", dataset_params, **attack_params["one_pixel"])
     elif attack_type == "pixle":
-        return PixleAttack("Pixle", **attack_params["pixle"])
+        return PixleAttack("Pixle", dataset_params, **attack_params["pixle"])
     elif attack_type == "square":
-        return SquareAttack("Square", **attack_params["square"])
+        return SquareAttack("Square", dataset_params, **attack_params["square"])
     else:
         raise ValueError("Invalid attack type")
 
-def create_attack_dataset(attack, attack_loader, models):
+def create_attack_dataset(attack, train_loader, validation_loader, models):
     start_time = time.time()
     # Create detaset from fgsm attacked images
     print(f"Creating {attack} attacked dataset...")
     adv_images, org_images, model_idxs = [], [], []
+    adv_images_val, org_images_val = [], []
     for i, model in enumerate(models):
-        print(f"Running {attack} attack on {model.net_type}...")
-        temp_adv_images, temp_org_images = attack.run_attack(model, attack_loader)
+        print(f"Running {attack} attack on train dataset of {model.net_type} model...")
+        temp_adv_images, temp_org_images = attack.run_attack(model, train_loader)
+        print(f"Running {attack} attack on validation dataset of {model.net_type} model...")
+        temp_adv_images_val, temp_org_images_val = attack.run_attack(model, validation_loader)
         adv_images.extend(temp_adv_images)
         org_images.extend(temp_org_images)
+        adv_images_val.extend(temp_adv_images_val)
+        org_images_val.extend(temp_org_images_val)
         model_idxs.extend([i for _ in range(len(temp_adv_images))])
 
     attack_train_dataset = AttackDataset(adv_images, org_images, model_idxs)
-    # split training dataset into training and validation
-    attack_train_dataset, attack_validation_dataset = random_split(attack_train_dataset, 
-                                                    [config.train_split, config.validation_split],
-                                                    generator=torch_generator)
-    attack_train_loader = DataLoader(attack_train_dataset, batch_size=config.batch_size, shuffle=True)
-    attack_validation_loader = DataLoader(attack_validation_dataset, batch_size=config.batch_size, shuffle=False)
+    attack_valid_dataset = AttackDataset(adv_images_val, org_images_val, model_idxs)
+    attack_train_loader = DataLoader(attack_train_dataset, batch_size=config.batch_size, shuffle=True, 
+                                     worker_init_fn=seed_worker, generator=torch_generator)
+    attack_valid_loader = DataLoader(attack_valid_dataset, batch_size=config.batch_size, shuffle=False,
+                                     worker_init_fn=seed_worker, generator=torch_generator)
 
+    print("--- Attack dataset created ---")
     print(f"Training {attack} attacked dataset size: {len(attack_train_loader.dataset)}")
-    print(f"Validation {attack} attacked dataset size: {len(attack_validation_loader.dataset)}")
+    print(f"Validation {attack} attacked dataset size: {len(attack_valid_loader.dataset)}")
     print('--- Total time: %s seconds ---' % (time.time() - start_time))
 
-    return attack_train_loader, attack_validation_loader
+    return attack_train_loader, attack_valid_loader
 
 
 if __name__ == "__main__":
@@ -89,24 +94,32 @@ if __name__ == "__main__":
         attacked_models.append(load_model(model_path, device))
         print(f"Loaded model {attacked_models[-1].net_type}")
 
-    loader = cifar10_loader_resnet
-    attack_loader = loader(device, config.batch_size, transform_train, torch_generator=torch_generator, train=True)
-    test_loader = loader(device, config.batch_size, transform_test, torch_generator=torch_generator)
+    # loader = cifar10_loader_resnet
+    # attack_loader = loader(device, config.batch_size, transform_train, torch_generator=torch_generator, train=True)
+    # test_loader = loader(device, config.batch_size, transform_test, torch_generator=torch_generator)
+    base_dataset = BaseDataset(config.dataset_name, config.batch_size, config.train_split,
+                               normalize=False, torch_generator=torch_generator, sample_percent=config.sample_percent)
+    base_dataset.create_dataloaders()
+    train_loader = base_dataset.get_train_dataloader()
+    validation_loader = base_dataset.get_validation_dataloader()
+    test_loader = base_dataset.get_test_dataloader()
 
     print(f"Attack type: {config.attack_type}")
-    attack = create_attack(config.attack_type, config.attack_params)
+    maen_values, std_values = base_dataset.get_normalization_params()
+    dataset_params = {
+        "mean": maen_values,
+        "std": std_values,
+    }
+    attack = create_attack(config.attack_type, dataset_params, config.attack_params)
     attack_train_loader, attack_validation_loader = create_attack_dataset(
-        attack, attack_loader, attacked_models
-)
-    print(f"Training set size: {len(attack_train_loader.dataset)}")
-    print(f"Validation set size: {len(attack_validation_loader.dataset)}")
-    print(f"Test set size: {len(test_loader.dataset)}")
-
+        attack, train_loader, validation_loader, attacked_models
+    )
     # Train denoising model
 
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
-    model = UNet(n_channels=3, n_classes=3, bilinear=config.bilinear, learn_noise=config.learn_noise)
+    model = UNet(n_channels=base_dataset.num_channels, n_classes=base_dataset.num_channels, 
+                 bilinear=config.bilinear, learn_noise=config.learn_noise)
     model = model.to(device=device)
 
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
