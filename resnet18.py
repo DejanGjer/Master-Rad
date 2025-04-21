@@ -35,9 +35,11 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.in_planes = 64
         self.net_type = net_type
+        self.num_in_channels = num_in_channels
+        self.num_classes = num_classes
 
         if ('normal' in self.net_type) or ('hybrid_nor' in self.net_type) or ('synergy_nor' in self.net_type) or ('synergy_all' in self.net_type):
-           self.conv1_normal = nn.Conv2d(num_in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
+           self.conv1_normal = nn.Conv2d(self.num_in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
            self.bn1_normal = nn.BatchNorm2d(64)
            self.layer1_normal = self._make_layer(block, 64, num_blocks[0], stride=1)
            self.layer2_normal = self._make_layer(block, 128, num_blocks[1], stride=2)
@@ -45,7 +47,7 @@ class ResNet(nn.Module):
            self.layer4_normal = self._make_layer(block, 512, num_blocks[3], stride=2)
 
         if ('negative' in self.net_type) or ('hybrid_neg' in self.net_type) or ('synergy_neg' in self.net_type) or ('synergy_all' in self.net_type):
-           self.conv1_negative = nn.Conv2d(num_in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
+           self.conv1_negative = nn.Conv2d(self.num_in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
            self.bn1_negative = nn.BatchNorm2d(64)
            self.layer1_negative = self._make_layer(block, 64, num_blocks[0], stride=1)
            self.layer2_negative = self._make_layer(block, 128, num_blocks[1], stride=2)
@@ -53,13 +55,13 @@ class ResNet(nn.Module):
            self.layer4_negative = self._make_layer(block, 512, num_blocks[3], stride=2)
 
         if ('normal' in self.net_type) or ('synergy_nor' in self.net_type) or ('synergy_all' in self.net_type):      
-           self.linear_normal = nn.Linear(512*block.expansion, num_classes)
+           self.linear_normal = nn.Linear(512*block.expansion, self.num_classes)
         if ('hybrid_nor' in self.net_type) or ('synergy_nor' in self.net_type) or ('synergy_all' in self.net_type):
-           self.linear_normal_n = nn.Linear(512*block.expansion, num_classes)
+           self.linear_normal_n = nn.Linear(512*block.expansion,self. num_classes)
         if ('hybrid_neg' in self.net_type) or ('synergy_neg' in self.net_type) or ('synergy_all' in self.net_type):
-           self.linear_negative = nn.Linear(512*block.expansion, num_classes)
+           self.linear_negative = nn.Linear(512*block.expansion, self.num_classes)
         if ('negative' in self.net_type) or ('synergy_neg' in self.net_type) or ('synergy_all' in self.net_type):
-           self.linear_negative_n = nn.Linear(512*block.expansion, num_classes)
+           self.linear_negative_n = nn.Linear(512*block.expansion, self.num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
