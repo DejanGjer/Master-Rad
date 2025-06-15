@@ -60,6 +60,7 @@ test_model_paths = [
 ]
 
 denoiser_path = './denoiser_checkpoints/2025-04-21_09-03-11/checkpoints/denoiser.pth'
+denoiser_type = 'unet'  # 'unet' or one of available arch from denoised-smoothing submodule in architectures.py DENOISERS_ARCHITECTURES
 
 # saving paths
 save_root_path = './results'
