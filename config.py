@@ -57,17 +57,16 @@ seed = 42
 
 # model paths
 train_model_paths = [
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_normal.pth',
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_normal.pth',
 ]
 test_model_paths = [
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_normal.pth',
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_negative.pth',
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_hybrid_nor.pth',
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_hybrid_neg.pth',
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_synergy_nor.pth',
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_synergy_neg.pth',
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_synergy_all.pth',
-    './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_tr_synergy_all.pth'
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_negative.pth',
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_hybrid_nor.pth',
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_hybrid_neg.pth',
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_nor.pth',
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_neg.pth',
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_all.pth',
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_tr_synergy_all.pth',
 ]
 
 # saving paths
