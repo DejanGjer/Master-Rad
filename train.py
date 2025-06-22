@@ -42,6 +42,7 @@ def train(model, device, train_loader, validation_loader, optimizer, epoch, loss
     validation_loss, validation_accuracy = validate(model, device, validation_loader, loss_fn)
     if train_metrics:
         train_metrics.update(train_loss, validation_loss, validation_accuracy)
+    return train_loss, validation_loss, validation_accuracy
             
 def validate(model, device, validation_loader, loss_fn):
     model.eval()
@@ -97,12 +98,16 @@ def train_normal_model(save_dir, device, dataset):
                                 model_normal.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_normal, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("normal")
+    best_validation_accuracy = 0.0
     for epoch in range(1, config.epochs + 1):
-        train(model_normal, device, train_loader, validation_loader, optimizer_normal,
+        _, _, validation_accuracy = train(model_normal, device, train_loader, validation_loader, optimizer_normal,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
+        if validation_accuracy > best_validation_accuracy:
+            best_validation_accuracy = validation_accuracy
+            torch.save(model_normal, model_normal_path)
+            print(f"Saved model at {model_normal_path} with validation accuracy {validation_accuracy:.2f}%")
     model_normal.freeze()
-    torch.save(model_normal, model_normal_path)
     train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
     train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(model_normal)
@@ -120,12 +125,16 @@ def train_negative_model(save_dir, device, dataset):
                                 model_negative.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_negative, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("negative")
+    best_validation_accuracy = 0.0
     for epoch in range(1, config.epochs + 1):
-        train(model_negative, device, train_loader, validation_loader, optimizer_negative,
+        _, _, validation_accuracy = train(model_negative, device, train_loader, validation_loader, optimizer_negative,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
+        if validation_accuracy > best_validation_accuracy:
+            best_validation_accuracy = validation_accuracy
+            torch.save(model_negative, model_negative_path)
+            print(f"Saved model at {model_negative_path} with validation accuracy {validation_accuracy:.2f}%")
     model_negative.freeze()
-    torch.save(model_negative, model_negative_path)
     train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
     train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(model_negative)
@@ -145,11 +154,15 @@ def train_hybrid_nor_model(save_dir, device, dataset, model_normal):
                                 model_hybrid_nor.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_nor, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("hybrid_nor")
+    best_validation_accuracy = 0.0
     for epoch in range(1, config.epochs + 1):
-        train(model_hybrid_nor, device, train_loader, validation_loader, optimizer_hybrid_nor,
+        _, _, validation_accuracy = train(model_hybrid_nor, device, train_loader, validation_loader, optimizer_hybrid_nor,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
-    torch.save(model_hybrid_nor, model_hybrid_nor_path)
+        if validation_accuracy > best_validation_accuracy:
+            best_validation_accuracy = validation_accuracy
+            torch.save(model_hybrid_nor, model_hybrid_nor_path)
+            print(f"Saved model at {model_hybrid_nor_path} with validation accuracy {validation_accuracy:.2f}%")
     train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
     train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(model_hybrid_nor)
@@ -169,11 +182,15 @@ def train_hybrid_neg_model(save_dir, device, dataset, model_negative):
                                 model_hybrid_neg.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_hybrid_neg, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("hybrid_neg")
+    best_validation_accuracy = 0.0
     for epoch in range(1, config.epochs + 1):
-        train(model_hybrid_neg, device, train_loader, validation_loader, optimizer_hybrid_neg,
+        _, _, validation_accuracy = train(model_hybrid_neg, device, train_loader, validation_loader, optimizer_hybrid_neg,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
-    torch.save(model_hybrid_neg, model_hybrid_neg_path)
+        if validation_accuracy > best_validation_accuracy:
+            best_validation_accuracy = validation_accuracy
+            torch.save(model_hybrid_neg, model_hybrid_neg_path)
+            print(f"Saved model at {model_hybrid_neg_path} with validation accuracy {validation_accuracy:.2f}%")
     train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
     train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(model_hybrid_neg)
@@ -238,11 +255,15 @@ def train_tr_synergy_all_model(save_dir, device, dataset, model_normal, model_ne
                                 tr_synergy_all.parameters()), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer_tr_synergy_all, milestones=config.milestones, gamma=0.1)
     train_metrics = TrainMetrics("tr_synergy_all")
+    best_validation_accuracy = 0.0
     for epoch in range(1, config.epochs + 1):
-        train(tr_synergy_all, device, train_loader, validation_loader, optimizer_tr_synergy_all,
+        _, _, validation_accuracy = train(tr_synergy_all, device, train_loader, validation_loader, optimizer_tr_synergy_all,
             epoch, loss_fn=F.cross_entropy, train_metrics=train_metrics)
         scheduler.step()
-    torch.save(tr_synergy_all, model_tr_synergy_all_path)
+        if validation_accuracy > best_validation_accuracy:
+            best_validation_accuracy = validation_accuracy
+            torch.save(tr_synergy_all, model_tr_synergy_all_path)
+            print(f"Saved model at {model_tr_synergy_all_path} with validation accuracy {validation_accuracy:.2f}%")
     train_metrics.save_metrics_to_csv(os.path.join(save_dir, config.metrics_dir))
     train_metrics.plot_metrics(os.path.join(save_dir, config.plot_dir))
     unload_model(tr_synergy_all)
