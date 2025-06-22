@@ -120,12 +120,11 @@ if __name__ == "__main__":
     }
     attack = create_attack(config.attack_type, dataset_params, config.attack_params)
 
-    # TODO - Load denoiser model
     if config.denoiser_arch == "unet":
         model = load_model(config.denoiser_path, device)
     else:
         checkpoint = torch.load(config.denoiser_path, map_location=device)
-        model = get_architecture(checkpoint['arch'] ,config.dataset_name)
+        model = get_architecture(checkpoint['arch'], config.dataset_name)
         model.load_state_dict(checkpoint['state_dict'])
     model = model.to(device=device)
     model.eval()

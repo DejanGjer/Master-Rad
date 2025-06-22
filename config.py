@@ -1,5 +1,5 @@
 # dataset
-dataset_name = 'cifar100' # cifar10, cifar100, mnist, imagenette
+dataset_name = 'cifar10' # cifar10, cifar100, mnist, imagenette
 sample_percent = None # None for all data, 0.1 for 10% of the data, etc.
 train_split = 0.8 
 validation_split = 0.2 # test set is loaded separately  
@@ -72,4 +72,3 @@ test_model_paths = [
 
 # saving paths
 save_root_path = './results'
-pgd_save_path = 'pgd_datasets'

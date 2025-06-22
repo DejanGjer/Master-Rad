@@ -1,5 +1,5 @@
 # dataset
-dataset_name = 'cifar100' # cifar10, cifar100, mnist, imagenette
+dataset_name = 'cifar10' # cifar10, cifar100, mnist, imagenette
 sample_percent = None # None for all data, 0.1 for 10% of the data, etc.
 seed = 42
 
@@ -60,8 +60,8 @@ test_model_paths = [
     './base_training_checkpoints/2025-04-21_09-03-11/checkpoints/model_tr_synergy_all.pth'
 ]
 
-denoiser_path = 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\results\\2025-04-21_20-42-08\\unet_denoiser.pt'
-denoiser_arch = 'unet'  # 'unet' or one of available arch from denoised-smoothing submodule in architectures.py DENOISERS_ARCHITECTURES
+denoiser_path = 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\denoised-smoothing\\pretrained_models\\trained_denoisers\\cifar10\\mse_obj\\dncnn\\epochs_90\\noise_0.25\\checkpoint.pth.tar'
+denoiser_arch = 'cifar_dncnn'  # 'unet' or one of available arch from denoised-smoothing submodule in architectures.py DENOISERS_ARCHITECTURES
 
 # saving paths
 save_root_path = './results'
