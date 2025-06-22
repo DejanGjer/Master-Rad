@@ -282,8 +282,8 @@ if __name__ == "__main__":
         save_dir = os.path.join(os.getcwd(), config.base_save_dir)
     save_config_file(save_dir, "config_train.py")
 
-    dataset = BaseDataset(config.dataset_name, config.batch_size, config.train_split, 
-                          normalize=True, torch_generator=torch_generator, sample_percent=config.sample_percent)
+    dataset = BaseDataset(config.dataset_name, config.batch_size, normalize=True, torch_generator=torch_generator, 
+                          train_split=config.train_split, sample_percent=config.sample_percent)
     dataset.create_dataloaders()
 
     model_info = config.model_info

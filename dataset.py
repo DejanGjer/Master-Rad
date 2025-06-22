@@ -11,7 +11,7 @@ SEED = 42
 class BaseDataset:
     DATASETS = ["cifar10", "cifar100", "mnist", "imagenette"]
 
-    def __init__(self, dataset_name, batch_size, train_split, normalize, torch_generator, sample_percent=None):
+    def __init__(self, dataset_name, batch_size, normalize, torch_generator, train_split=1.0, sample_percent=None):
         assert dataset_name in self.DATASETS, f"Dataset {dataset_name} not supported. Supported datasets: {self.DATASETS}"
         self.dataset_name = dataset_name
         self.batch_size = batch_size

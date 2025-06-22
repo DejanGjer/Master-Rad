@@ -97,8 +97,8 @@ if __name__ == "__main__":
     # loader = cifar10_loader_resnet
     # attack_loader = loader(device, config.batch_size, transform_train, torch_generator=torch_generator, train=True)
     # test_loader = loader(device, config.batch_size, transform_test, torch_generator=torch_generator)
-    base_dataset = BaseDataset(config.dataset_name, config.batch_size, config.train_split,
-                               normalize=False, torch_generator=torch_generator, sample_percent=config.sample_percent)
+    base_dataset = BaseDataset(config.dataset_name, config.batch_size, normalize=False, torch_generator=torch_generator,
+                               train_split=config.train_split, sample_percent=config.sample_percent)
     base_dataset.create_dataloaders()
     train_loader = base_dataset.get_train_dataloader()
     validation_loader = base_dataset.get_validation_dataloader()

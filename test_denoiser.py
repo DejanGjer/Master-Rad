@@ -8,15 +8,35 @@ import os
 
 import pandas as pd
 
-import config
+import config_test as config
 from resnet18 import ResNet, BasicBlock
 from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device, save_config_file
 from dataset import cifar10_loader_resnet, transform_train, transform_test, AttackDataset, BaseDataset, seed_worker
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
-
 from attacks import Attack, FGSMAttack, RFGSMAttack, PGDAttack, OnePixelAttack, PixleAttack, SquareAttack
 
+import sys
+from pathlib import Path
+import importlib.util
+
+# Path to architectures.py
+module_path = Path("denoised-smoothing/code/architectures.py").resolve()
+module_name = "denoised_smoothing_architectures"
+
+# Add submodule/code/ folder to sys.path so imports like 'from archs' work
+sys.path.insert(0, str(module_path.parent))  # <-- critical!
+
+# Load the module
+spec = importlib.util.spec_from_file_location(module_name, module_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Now the internal import in architectures.py should succeed
+get_architecture = module.get_architecture
+
+
+# Set random seeds for reproducibility
 torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
 torch.backends.cudnn.deterministic = True
@@ -87,8 +107,8 @@ if __name__ == "__main__":
     print(f"Base classfier models to test: {config.test_model_paths}")
     print(f"Denoiser path: {config.denoiser_path}")
     
-    base_dataset = BaseDataset(config.dataset_name, config.batch_size, config.train_split,
-                               normalize=False, torch_generator=torch_generator, sample_percent=config.sample_percent)
+    base_dataset = BaseDataset(config.dataset_name, config.batch_size, normalize=False, 
+                               torch_generator=torch_generator, sample_percent=config.sample_percent)
     base_dataset.create_dataloaders()
     test_loader = base_dataset.get_test_dataloader()
 
@@ -101,7 +121,14 @@ if __name__ == "__main__":
     attack = create_attack(config.attack_type, dataset_params, config.attack_params)
 
     # TODO - Load denoiser model
-    model = None
+    if config.denoiser_arch == "unet":
+        model = load_model(config.denoiser_path, device)
+    else:
+        checkpoint = torch.load(config.denoiser_path, map_location=device)
+        model = get_architecture(checkpoint['arch'] ,config.dataset_name)
+        model.load_state_dict(checkpoint['state_dict'])
+    model = model.to(device=device)
+    model.eval()
 
     # Loading classfier models needed for testing
     test_models = []
@@ -112,8 +139,6 @@ if __name__ == "__main__":
 
     save_dir = create_save_directories(config.save_root_path)
 
-    model.eval()
-    # Run test for each epsilon value
     total_average_improvement = 0
     # pandas dataframe to save all detailed results
     results = None
