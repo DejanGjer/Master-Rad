@@ -8,15 +8,35 @@ import os
 
 import pandas as pd
 
-import config
+import config_test as config
 from resnet18 import ResNet, BasicBlock
 from utils import load_model, save_model, create_save_directories, plot_loss_history, set_compute_device, save_config_file
 from dataset import cifar10_loader_resnet, transform_train, transform_test, AttackDataset, BaseDataset, seed_worker
 from denoiser import train_denoiser, test_denoiser
 from unet import UNet
-
 from attacks import Attack, FGSMAttack, RFGSMAttack, PGDAttack, OnePixelAttack, PixleAttack, SquareAttack
 
+import sys
+from pathlib import Path
+import importlib.util
+
+# Path to architectures.py
+module_path = Path("denoised-smoothing/code/architectures.py").resolve()
+module_name = "denoised_smoothing_architectures"
+
+# Add submodule/code/ folder to sys.path so imports like 'from archs' work
+sys.path.insert(0, str(module_path.parent))  # <-- critical!
+
+# Load the module
+spec = importlib.util.spec_from_file_location(module_name, module_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Now the internal import in architectures.py should succeed
+get_architecture = module.get_architecture
+
+
+# Set random seeds for reproducibility
 torch.manual_seed(42)
 generator = torch.Generator().manual_seed(42)
 torch.backends.cudnn.deterministic = True
@@ -79,85 +99,45 @@ if __name__ == "__main__":
     # Set device
     device = set_compute_device()
 
-    print("Configuration details:")
-    print(f"Learning rate: {config.learning_rate}")
+    print("Testing denoiser configuration:")
+    print(f"Dataset: {config.dataset_name}")
+    print(f"Attack type: {config.attack_type}")
+    print(f"Attack parameters: {config.attack_params}")
     print(f"Batch size: {config.batch_size}")
-    print(f"Epochs: {config.epochs}")
-    print(f"Bilinear: {config.bilinear}")
-    print(f"Learn noise: {config.learn_noise}")
-    print(f"Loss type: {config.loss}")
-    print("---------------------------------")
-
-    # Loading models needed for training
-    attacked_models = []
-    for model_path in config.train_model_paths:
-        attacked_models.append(load_model(model_path, device))
-        print(f"Loaded model {attacked_models[-1].net_type}")
-
-    # loader = cifar10_loader_resnet
-    # attack_loader = loader(device, config.batch_size, transform_train, torch_generator=torch_generator, train=True)
-    # test_loader = loader(device, config.batch_size, transform_test, torch_generator=torch_generator)
-    base_dataset = BaseDataset(config.dataset_name, config.batch_size, normalize=False, torch_generator=torch_generator,
-                               train_split=config.train_split, sample_percent=config.sample_percent)
+    print(f"Base classfier models to test: {config.test_model_paths}")
+    print(f"Denoiser path: {config.denoiser_path}")
+    
+    base_dataset = BaseDataset(config.dataset_name, config.batch_size, normalize=False, 
+                               torch_generator=torch_generator, sample_percent=config.sample_percent)
     base_dataset.create_dataloaders()
-    train_loader = base_dataset.get_train_dataloader()
-    validation_loader = base_dataset.get_validation_dataloader()
     test_loader = base_dataset.get_test_dataloader()
 
     print(f"Attack type: {config.attack_type}")
-    maen_values, std_values = base_dataset.get_normalization_params()
+    mean_values, std_values = base_dataset.get_normalization_params()
     dataset_params = {
-        "mean": maen_values,
+        "mean": mean_values,
         "std": std_values,
     }
     attack = create_attack(config.attack_type, dataset_params, config.attack_params)
-    attack_train_loader, attack_validation_loader = create_attack_dataset(
-        attack, train_loader, validation_loader, attacked_models
-    )
-    # Train denoising model
 
-    # n_channels=3 for RGB images
-    # n_classes is the number of probabilities you want to get per pixel
-    model = UNet(n_channels=base_dataset.num_channels, n_classes=base_dataset.num_channels, 
-                 bilinear=config.bilinear, learn_noise=config.learn_noise)
+    if config.denoiser_arch == "unet":
+        model = load_model(config.denoiser_path, device)
+    else:
+        checkpoint = torch.load(config.denoiser_path, map_location=device)
+        model = get_architecture(checkpoint['arch'], config.dataset_name)
+        model.load_state_dict(checkpoint['state_dict'])
     model = model.to(device=device)
+    model.eval()
 
-    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
-    start_time = time.time()
-
-    metrics = {
-        'train_loss': [],
-        'validation_loss': []
-    }
-    # training loop
-    for epoch in range(1, config.epochs + 1):
-        train_losses = train_denoiser(model, attack_train_loader, optimizer, config.loss, device, 
-                                      defended_models=attacked_models)
-        print(f"Average training loss (epoch {epoch}): {np.mean(train_losses)}")
-        validation_losses = test_denoiser(model, attack_validation_loader, config.loss, device,
-                                          defended_models=attacked_models)
-        print(f"Average validation loss (epoch {epoch}): {np.mean(validation_losses)}")
-        metrics["train_loss"].append(np.mean(train_losses))
-        metrics["validation_loss"].append(np.mean(validation_losses))
-
-    save_dir = create_save_directories(config.save_root_path)
-    save_model(model, os.path.join(save_dir, 'unet_denoiser.pt'))
-    plot_loss_history(metrics, os.path.join(save_dir, 'loss_history.png'))
-    # convert metrics to pandas dataframe and save it
-    metrics = pd.DataFrame(metrics)
-    metrics.to_csv(os.path.join(save_dir, 'losses.csv'), index=False)
-    # save configuration file
-    save_config_file(save_dir, 'config.py')
-
-    # Loading models needed for testing
+    # Loading classfier models needed for testing
     test_models = []
     for model_path in config.test_model_paths:
         test_models.append(load_model(model_path, device))
         print(f"Loaded model {test_models[-1].net_type}") 
         test_models[-1].eval()
 
-    model.eval()
-    # Run test for each epsilon value
+    save_dir = create_save_directories(config.save_root_path)
+
     total_average_improvement = 0
     # pandas dataframe to save all detailed results
     results = None

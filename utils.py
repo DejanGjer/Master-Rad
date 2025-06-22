@@ -60,6 +60,6 @@ def set_compute_device():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     if device == torch.device('cpu'):
-        print("WARNING: Dataset is going to be sampled!")
+        print("WARNING: Dataset is runnigng on cpu and is possibly automatically sampled!")
     return device
 

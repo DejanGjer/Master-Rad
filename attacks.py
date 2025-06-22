@@ -12,7 +12,6 @@ from tqdm import tqdm
 import pandas as pd
 import math
 
-from dataset import CIFAR10_MEAN, CIFAR10_STD
 from utils import normalize_images
 
 class Attack(ABC):

@@ -258,30 +258,6 @@ def unload_model(model):
     del model
     torch.cuda.empty_cache()
 
-# def create_datasets():
-#     dataset = BaseDataset(config.dataset_name, config.batch_size, config.train_split, 
-#                           normalize=False, torch_generator=torch_generator, sample_percent=config.sample_percent)
-#     return dataset.get_dataloaders()
-    # loader = cifar10_loader_resnet
-    # train_loader = loader(device, config.batch_size, transform_base_train, torch_generator=torch_generator, train=True)
-    # test_loader = loader(device, config.batch_size, transform_base_test, torch_generator=torch_generator)
-    # # split training dataset into training and validation
-    # train_dataset, validation_dataset = random_split(train_loader.dataset, 
-    #                                                 [config.train_split, config.validation_split],
-    #                                                 generator=torch_generator)
-    # train_loader = torch.utils.data.DataLoader(train_dataset, 
-    #                                            batch_size=config.batch_size, 
-    #                                            shuffle=True, 
-    #                                            worker_init_fn=seed_worker, 
-    #                                            generator=torch_generator)
-    # validation_loader = torch.utils.data.DataLoader(validation_dataset, 
-    #                                                 batch_size=config.batch_size, 
-    #                                                 shuffle=False, 
-    #                                                 worker_init_fn=seed_worker, 
-    #                                                 generator=torch_generator)
-    # return train_loader, validation_loader, test_loader
-
-
 def print_training_info(device):
     print("Configuration details:")
     print(f"Learning rate: {config.learning_rate}")
@@ -306,8 +282,8 @@ if __name__ == "__main__":
         save_dir = os.path.join(os.getcwd(), config.base_save_dir)
     save_config_file(save_dir, "config_train.py")
 
-    dataset = BaseDataset(config.dataset_name, config.batch_size, config.train_split, 
-                          normalize=True, torch_generator=torch_generator, sample_percent=config.sample_percent)
+    dataset = BaseDataset(config.dataset_name, config.batch_size, normalize=True, torch_generator=torch_generator, 
+                          train_split=config.train_split, sample_percent=config.sample_percent)
     dataset.create_dataloaders()
 
     model_info = config.model_info

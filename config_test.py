@@ -1,8 +1,7 @@
 # dataset
 dataset_name = 'cifar10' # cifar10, cifar100, mnist, imagenette
 sample_percent = None # None for all data, 0.1 for 10% of the data, etc.
-train_split = 0.8 
-validation_split = 0.2 # test set is loaded separately  
+seed = 42
 
 # attack parameters
 attack_type = 'fgsm'
@@ -47,19 +46,11 @@ attack_params = {
 }
 
 # hyperparameters
-learning_rate = 0.001
 batch_size = 128
-epochs = 15
-bilinear = True
-learn_noise = True
-loss = 'lgd' # type of the loss can be pgd and lgd
-seed = 42
 
 # model paths
-train_model_paths = [
-    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_normal.pth',
-]
 test_model_paths = [
+    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_normal.pth',
     'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_negative.pth',
     'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_hybrid_nor.pth',
     'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_hybrid_neg.pth',
@@ -68,6 +59,9 @@ test_model_paths = [
     'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_all.pth',
     'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_tr_synergy_all.pth',
 ]
+
+denoiser_path = 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\denoised-smoothing\\pretrained_models\\trained_denoisers\\cifar10\\stab_obj\\local_run\\checkpoint.pth.tar'
+denoiser_arch = 'cifar_dncnn'  # 'unet' or one of available arch from denoised-smoothing submodule in architectures.py DENOISERS_ARCHITECTURES
 
 # saving paths
 save_root_path = './results'
