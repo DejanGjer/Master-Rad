@@ -129,6 +129,8 @@ if __name__ == "__main__":
         'train_loss': [],
         'validation_loss': []
     }
+    save_dir = create_save_directories(config.save_root_path)
+    best_validation_loss = float('inf')
     # training loop
     for epoch in range(1, config.epochs + 1):
         train_losses = train_denoiser(model, attack_train_loader, optimizer, config.loss, device, 
@@ -137,11 +139,14 @@ if __name__ == "__main__":
         validation_losses = test_denoiser(model, attack_validation_loader, config.loss, device,
                                           defended_models=attacked_models)
         print(f"Average validation loss (epoch {epoch}): {np.mean(validation_losses)}")
-        metrics["train_loss"].append(np.mean(train_losses))
-        metrics["validation_loss"].append(np.mean(validation_losses))
+        mean_train_loss, mean_validation_loss = np.mean(train_losses), np.mean(validation_losses)
+        metrics["train_loss"].append(mean_train_loss)
+        metrics["validation_loss"].append(mean_validation_loss)
+        if mean_validation_loss < best_validation_loss:
+            best_validation_loss = mean_validation_loss
+            save_model(model, os.path.join(save_dir, 'unet_denoiser.pt'))
+            print(f"Saved best model at epoch {epoch} with validation loss: {best_validation_loss}")
 
-    save_dir = create_save_directories(config.save_root_path)
-    save_model(model, os.path.join(save_dir, 'unet_denoiser.pt'))
     plot_loss_history(metrics, os.path.join(save_dir, 'loss_history.png'))
     # convert metrics to pandas dataframe and save it
     metrics = pd.DataFrame(metrics)
