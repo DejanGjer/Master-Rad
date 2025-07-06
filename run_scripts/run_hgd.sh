@@ -7,4 +7,5 @@
 #SBATCH --error slurm.%J.err
 #SBATCH --time=24:00:00
 
+cd ..
 CUDA_VISIBLE_DEVICES=0 python main.py

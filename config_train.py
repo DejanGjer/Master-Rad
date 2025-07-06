@@ -3,6 +3,7 @@ checkpoint_dir = 'checkpoints'
 plot_dir = 'plots'
 metrics_dir = 'metrics'
 create_new_saving_dir = True
+save_config_file = True
 seed = 42
 
 model_info = {

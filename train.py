@@ -287,9 +287,9 @@ def print_training_info(device):
     print(f"Batch size: {config.batch_size}")
     print(f"Epochs: {config.epochs}")
     print(f"Milestones: {config.milestones}")
-    print("---------------------------------")
     print(f"Device used for training: {device}")
-
+    print(f"CUDA_VISIBLE_DEVICES: {os.environ.get('CUDA_VISIBLE_DEVICES')}")
+    print("---------------------------------")
 
 if __name__ == "__main__":
     # Set device
@@ -301,7 +301,8 @@ if __name__ == "__main__":
         save_dir = create_save_directories(os.path.join(os.getcwd(), config.base_save_dir))
     else:
         save_dir = os.path.join(os.getcwd(), config.base_save_dir)
-    save_config_file(save_dir, "config_train.py")
+    if config.save_config_file:
+        save_config_file(save_dir, "config_train.py")
 
     dataset = BaseDataset(config.dataset_name, config.batch_size, normalize=True, torch_generator=torch_generator, 
                           train_split=config.train_split, sample_percent=config.sample_percent)
