@@ -24,9 +24,24 @@ def load_model(path, device):
 def save_model(model, path):
     torch.save(model, path)
 
+def has_timestamped_directory(path: str) -> bool:
+    # checks if some directory on a path already contains a timestamp format
+    for dirname in os.path.normpath(os.path.abspath(path)).split(os.sep):
+        # check if directory name ,astches this time format %Y-%m-%d_%H-%M-%S
+        try:
+            if dt.strptime(dirname, "%Y-%m-%d_%H-%M-%S"):
+                print(f"Found timestamped directory: {dirname}")
+                return True
+        except ValueError:
+            continue
+    return False
+
 def create_save_directories(root_path):
-    # create directory if it doesn't exist
-    dir_path = os.path.join(root_path, dt.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    dir_path = root_path
+    # Check if the root path already has a timestamped directory if not add it
+    if not has_timestamped_directory(root_path):
+        dir_path = os.path.join(root_path, dt.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    # Create the directory if it does not exist
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     return dir_path
