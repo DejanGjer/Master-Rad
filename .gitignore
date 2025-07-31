@@ -63,6 +63,7 @@ __pycache__/
 
 # Ignore model weights
 base_training_checkpoints/
+hgd_training_results/
 checkpoints/
 original_models/
 *.pt
