@@ -7,10 +7,10 @@ learn_noise_values=(False True)
 loss_types=("pgd" "lgd")
 
 # Single-value parameters
-dataset_name="cifar10"
-attack_type="one_pixel"
+dataset_name="cifar100"
+attack_type="fgsm"
 
-nodes=("n16", "n19", "n20")
+nodes=("n16" "n19", "n20")
 
 original_code_dir=".."
 

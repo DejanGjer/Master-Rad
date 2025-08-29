@@ -8,9 +8,12 @@ import shutil
 
 def normalize_images(images: torch.Tensor, mean: List[float], std: List[float]) -> torch.Tensor:
     assert torch.max(images) <= 1.0 and torch.min(images) >= 0.0, "Images are not in range [0, 1]"
+    assert len(mean) == len(std), f"Mean and std must have same length, got {len(mean)} and {len(std)}"
     device = images.device
-    mean = torch.tensor(mean).view(1, 3, 1, 1).to(device)
-    std = torch.tensor(std).view(1, 3, 1, 1).to(device)
+    num_channels = len(mean)  # Get number of channels from the mean list
+    assert images.shape[1] == num_channels, f"Expected {num_channels} channels but got {images.shape[1]}"
+    mean = torch.tensor(mean).view(1, num_channels, 1, 1).to(device)
+    std = torch.tensor(std).view(1, num_channels, 1, 1).to(device)
     return (images - mean) / std
 
 def load_model(path, device):
