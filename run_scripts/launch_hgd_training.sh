@@ -7,7 +7,7 @@ learn_noise_values=(False True)
 loss_types=("pgd" "lgd")
 
 # Single-value parameters
-dataset_name="mnist"
+dataset_name="cifar100"
 attack_type="fgsm"
 
 nodes=("n16" "n19", "n20")
