@@ -4,13 +4,13 @@
 learning_rates=(0.001 0.003 0.01)
 bilinear_values=(False True)
 learn_noise_values=(False True)
-loss_types=("pgd" "lgd")
+loss_types=("lgd")
 
 # Single-value parameters
-dataset_name="cifar100"
-attack_type="fgsm"
+dataset_name="cifar10"
+attack_type="rfgsm"
 
-nodes=("n16" "n19", "n20")
+nodes=("n16" "n19" "n20")
 
 original_code_dir=".."
 

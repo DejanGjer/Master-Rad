@@ -64,6 +64,7 @@ __pycache__/
 # Ignore model weights
 base_training_checkpoints/
 hgd_training_results/
+synergy_defenses_results/
 checkpoints/
 original_models/
 *.pt
