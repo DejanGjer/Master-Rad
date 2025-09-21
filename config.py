@@ -50,7 +50,7 @@ attack_params = {
 learning_rate = 0.001
 batch_size = 128
 epochs = 30
-bilinear = True
+bilinear = False
 learn_noise = True
 loss = 'lgd' # type of the loss can be pgd and lgd
 seed = 42
@@ -58,22 +58,22 @@ seed = 42
 # model paths
 train_model_paths = [
     # CIFAR10
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_normal.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_normal.pth',
     # MNIST
     # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_19-40-43/2025-07-06_19-40-48/checkpoints/model_normal.pth'
     # CIFAR100
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_normal.pth'
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_normal.pth'
 ]
 test_model_paths = [
     # CIFAR10
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_normal.pth',
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_negative.pth',
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_hybrid_nor.pth',
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_hybrid_neg.pth',
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_synergy_nor.pth',
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_synergy_neg.pth',
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_synergy_all.pth',
-    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_tr_synergy_all.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_normal.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_negative.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_hybrid_nor.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_hybrid_neg.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_synergy_nor.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_synergy_neg.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_synergy_all.pth',
+    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_tr_synergy_all.pth',
     # MNIST
     # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_19-40-43/2025-07-06_19-40-48/checkpoints/model_normal.pth',
     # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_19-40-43/2025-07-06_19-40-48/checkpoints/model_negative.pth',
@@ -84,14 +84,14 @@ test_model_paths = [
     # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_19-40-43/2025-07-06_19-40-48/checkpoints/model_synergy_all.pth',
     # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_19-40-43/2025-07-06_19-40-48/checkpoints/model_tr_synergy_all.pth'
     # CIFAR100
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_normal.pth',
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_negative.pth',
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_hybrid_nor.pth',
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_hybrid_neg.pth',
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_synergy_nor.pth',
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_synergy_neg.pth',
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_synergy_all.pth',
-    # '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_tr_synergy_all.pth'
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_normal.pth',
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_negative.pth',
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_hybrid_nor.pth',
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_hybrid_neg.pth',
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_synergy_nor.pth',
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_synergy_neg.pth',
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_synergy_all.pth',
+    '/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-08_00-24-53/2025-07-08_00-24-53/checkpoints/model_tr_synergy_all.pth'
 ]
 
 # saving paths

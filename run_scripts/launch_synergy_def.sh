@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Single-value parameters
-dataset_name="cifar10"
+dataset_name="cifar100"
 attack_type="fgsm"
 
 # Define nodes
