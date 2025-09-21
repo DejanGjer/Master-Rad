@@ -36,7 +36,7 @@ attack_params = {
     },
     "square": {
         "norm": "Linf", # # L2 or Linf
-        "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
+        "epsilons": [0.01, 0.03, 0.05],
         "n_queries": 5000,
         "n_restarts": 1,
         "p_init": 0.8,
@@ -50,7 +50,7 @@ attack_params = {
 learning_rate = 0.001
 batch_size = 128
 epochs = 30
-bilinear = True
+bilinear = False
 learn_noise = True
 loss = 'lgd' # type of the loss can be pgd and lgd
 seed = 42
