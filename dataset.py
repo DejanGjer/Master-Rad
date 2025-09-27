@@ -53,6 +53,9 @@ class BaseDataset:
             self.num_channels = 1
         else:
             raise ValueError(f"Dataset {self.dataset_name} not supported. Supported datasets: {self.DATASETS}")
+        
+    def get_num_classes(self):
+        return self.num_classes
 
     def get_normalization_params(self):
         if self.dataset_name == "cifar10":
