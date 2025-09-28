@@ -45,6 +45,12 @@ attack_params = {
     },
 }
 
+# randomized smoothing parameters
+use_randomized_smoothing = False
+sigma = 0.05
+n = 100
+alpha = 0.001
+
 # hyperparameters
 batch_size = 128
 

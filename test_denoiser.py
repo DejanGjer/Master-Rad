@@ -1,3 +1,11 @@
+import os
+import sys
+from pathlib import Path
+
+# Add the code directory to Python path
+code_path = os.path.join(os.path.dirname(__file__), 'denoised_smoothing', 'code')
+sys.path.append(code_path)
+
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
@@ -16,24 +24,26 @@ from denoiser import train_denoiser, test_denoiser
 from unet import UNet
 from attacks import Attack, FGSMAttack, RFGSMAttack, PGDAttack, OnePixelAttack, PixleAttack, SquareAttack
 
-import sys
-from pathlib import Path
-import importlib.util
+from denoised_smoothing.code.architectures import get_architecture
 
-# Path to architectures.py
-module_path = Path("denoised-smoothing/code/architectures.py").resolve()
-module_name = "denoised_smoothing_architectures"
+# import sys
+# from pathlib import Path
+# import importlib.util
 
-# Add submodule/code/ folder to sys.path so imports like 'from archs' work
-sys.path.insert(0, str(module_path.parent))  # <-- critical!
+# # Path to architectures.py
+# module_path = Path("denoised-smoothing/code/architectures.py").resolve()
+# module_name = "denoised_smoothing_architectures"
 
-# Load the module
-spec = importlib.util.spec_from_file_location(module_name, module_path)
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+# # Add submodule/code/ folder to sys.path so imports like 'from archs' work
+# sys.path.insert(0, str(module_path.parent))  # <-- critical!
 
-# Now the internal import in architectures.py should succeed
-get_architecture = module.get_architecture
+# # Load the module
+# spec = importlib.util.spec_from_file_location(module_name, module_path)
+# module = importlib.util.module_from_spec(spec)
+# spec.loader.exec_module(module)
+
+# # Now the internal import in architectures.py should succeed
+# get_architecture = module.get_architecture
 
 
 # Set random seeds for reproducibility
@@ -149,7 +159,12 @@ if __name__ == "__main__":
             result = None
             result1 = attack.test_attack(attacked_model, test_loader, **attack_params)
             results = pd.concat([results, result1], ignore_index=True) if results is not None else result1
-            result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, **attack_params)
+            if config.use_randomized_smoothing:
+                attack_params = {**attack_params, "sigma": config.sigma, "n": config.n, "alpha": config.alpha, 
+                                 "num_classes": base_dataset.get_num_classes()}
+                result2 = attack.test_certified_model(attacked_model, model, test_loader, **attack_params)
+            else:
+                result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, **attack_params)
             results = pd.concat([results, result2], ignore_index=True)
             total_model_improvement += (result2["Accuracy"] - result1["Accuracy"]).iloc[0]
 
