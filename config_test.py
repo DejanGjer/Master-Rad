@@ -46,8 +46,9 @@ attack_params = {
 }
 
 # randomized smoothing parameters
-use_randomized_smoothing = False
-sigma = 0.05
+denoised_smoothing_run = True
+use_randomized_smoothing = True
+sigma = 0.1
 n = 100
 alpha = 0.001
 
@@ -67,7 +68,7 @@ test_model_paths = [
 ]
 
 # denoiser_path = 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\denoised-smoothing\\pretrained_models\\trained_denoisers\\cifar10\\stab_obj\\local_run\\checkpoint.pth.tar'
-denoiser_path = "C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\denoised-smoothing\\pretrained_models\\my_results\\correct\\stab_mse\\cifar10_dncnn_0_05\\checkpoint.pth.tar"
+denoiser_path = "C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\denoised-smoothing\\pretrained_models\\my_results\\polished\\stability_obj\\cifar10_dncnn_0_10\\best.pth.tar"
 denoiser_arch = 'cifar_dncnn'  # 'unet' or one of available arch from denoised-smoothing submodule in architectures.py DENOISERS_ARCHITECTURES
 
 # saving paths
