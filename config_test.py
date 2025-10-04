@@ -7,7 +7,7 @@ seed = 42
 attack_type = 'fgsm'
 attack_params = {
     "fgsm": {
-        "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05]
+        "epsilons": [0, 0.01, 0.02, 0.03, 0.04, 0.05]
     },
     "rfgsm": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],
@@ -45,22 +45,30 @@ attack_params = {
     },
 }
 
+# randomized smoothing parameters
+denoised_smoothing_run = True
+use_randomized_smoothing = True
+sigma = 0.1
+n = 100
+alpha = 0.001
+
 # hyperparameters
 batch_size = 128
 
 # model paths
 test_model_paths = [
     'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_normal.pth',
-    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_negative.pth',
-    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_hybrid_nor.pth',
-    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_hybrid_neg.pth',
-    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_nor.pth',
-    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_neg.pth',
-    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_all.pth',
-    'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_tr_synergy_all.pth',
+    # 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_negative.pth',
+    # 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_hybrid_nor.pth',
+    # 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_hybrid_neg.pth',
+    # 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_nor.pth',
+    # 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_neg.pth',
+    # 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_synergy_all.pth',
+    # 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\code\\base_training_checkpoints\\base_training_results\\2025-04-21_00-45-37\\checkpoints\\model_tr_synergy_all.pth',
 ]
 
-denoiser_path = 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\denoised-smoothing\\pretrained_models\\trained_denoisers\\cifar10\\stab_obj\\local_run\\checkpoint.pth.tar'
+# denoiser_path = 'C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\denoised-smoothing\\pretrained_models\\trained_denoisers\\cifar10\\stab_obj\\local_run\\checkpoint.pth.tar'
+denoiser_path = "C:\\Users\\dejan\\Workspace\\Master\\Master Rad\\Project\\denoised-smoothing\\pretrained_models\\my_results\\fixed_branch\\stability_obj\\cifar10_dncnn_0_10\\best.pth.tar"
 denoiser_arch = 'cifar_dncnn'  # 'unet' or one of available arch from denoised-smoothing submodule in architectures.py DENOISERS_ARCHITECTURES
 
 # saving paths

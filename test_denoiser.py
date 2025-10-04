@@ -1,3 +1,11 @@
+import os
+import sys
+from pathlib import Path
+
+# Add the code directory to Python path
+code_path = os.path.join(os.path.dirname(__file__), 'denoised_smoothing', 'code')
+sys.path.append(code_path)
+
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
@@ -16,24 +24,26 @@ from denoiser import train_denoiser, test_denoiser
 from unet import UNet
 from attacks import Attack, FGSMAttack, RFGSMAttack, PGDAttack, OnePixelAttack, PixleAttack, SquareAttack
 
-import sys
-from pathlib import Path
-import importlib.util
+from denoised_smoothing.code.architectures import get_architecture
 
-# Path to architectures.py
-module_path = Path("denoised-smoothing/code/architectures.py").resolve()
-module_name = "denoised_smoothing_architectures"
+# import sys
+# from pathlib import Path
+# import importlib.util
 
-# Add submodule/code/ folder to sys.path so imports like 'from archs' work
-sys.path.insert(0, str(module_path.parent))  # <-- critical!
+# # Path to architectures.py
+# module_path = Path("denoised-smoothing/code/architectures.py").resolve()
+# module_name = "denoised_smoothing_architectures"
 
-# Load the module
-spec = importlib.util.spec_from_file_location(module_name, module_path)
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
+# # Add submodule/code/ folder to sys.path so imports like 'from archs' work
+# sys.path.insert(0, str(module_path.parent))  # <-- critical!
 
-# Now the internal import in architectures.py should succeed
-get_architecture = module.get_architecture
+# # Load the module
+# spec = importlib.util.spec_from_file_location(module_name, module_path)
+# module = importlib.util.module_from_spec(spec)
+# spec.loader.exec_module(module)
+
+# # Now the internal import in architectures.py should succeed
+# get_architecture = module.get_architecture
 
 
 # Set random seeds for reproducibility
@@ -96,6 +106,8 @@ def create_attack_dataset(attack, train_loader, validation_loader, models):
 
 
 if __name__ == "__main__":
+    assert not config.use_randomized_smoothing or config.denoised_smoothing_run, "Randomized smoothing requires denoised smoothing run"
+
     # Set device
     device = set_compute_device()
 
@@ -132,8 +144,9 @@ if __name__ == "__main__":
     # Loading classfier models needed for testing
     test_models = []
     for model_path in config.test_model_paths:
-        test_models.append(load_model(model_path, device))
-        print(f"Loaded model {test_models[-1].net_type}") 
+        test_models.append(load_model(model_path, device, denoised_smoothing_run=config.denoised_smoothing_run,
+                                      dataset_name=config.dataset_name))
+        # print(f"Loaded model {test_models[-1].net_type}") 
         test_models[-1].eval()
 
     save_dir = create_save_directories(config.save_root_path)
@@ -147,18 +160,27 @@ if __name__ == "__main__":
         total_model_improvement = 0
         for attack_params in attack:
             result = None
-            result1 = attack.test_attack(attacked_model, test_loader, **attack_params)
+            result1 = attack.test_attack(attacked_model, test_loader, 
+                                         normalize_inputs=not config.denoised_smoothing_run, 
+                                         **attack_params)
             results = pd.concat([results, result1], ignore_index=True) if results is not None else result1
-            result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, **attack_params)
+            if config.use_randomized_smoothing:
+                attack_params = {**attack_params, "sigma": config.sigma, "n": config.n, "alpha": config.alpha, 
+                                 "num_classes": base_dataset.get_num_classes()}
+                result2 = attack.test_certified_model(attacked_model, model, test_loader, **attack_params)
+            else:
+                result2 = attack.test_attack(attacked_model, test_loader, denoiser_model=model, 
+                                             normalize_inputs=not config.denoised_smoothing_run, **attack_params)
             results = pd.concat([results, result2], ignore_index=True)
             total_model_improvement += (result2["Accuracy"] - result1["Accuracy"]).iloc[0]
 
         total_average_improvement += total_model_improvement / len(attack)
-        averaged_results_temp = pd.DataFrame({'Model': [attacked_model.net_type], 
-                                      'Average Improvement': [total_model_improvement / len(attack)]})
+        averaged_results_temp = pd.DataFrame({ 
+                                    'Average Improvement': [total_model_improvement / len(attack)]
+                                })
         averaged_results = pd.concat([averaged_results, averaged_results_temp], ignore_index=True) \
                            if averaged_results is not None else averaged_results_temp
-        print(f"Average improvement for {attacked_model.net_type}: {100 * total_model_improvement / len(attack)}%")
+        print(f"Average improvement for denoised model: {100 * total_model_improvement / len(attack)}%")
     print(f"Average improvement for all models: {100 * total_average_improvement / (len(test_models))}%")
     # save results dataframes
     results.to_csv(os.path.join(save_dir, 'results.csv'), index=False)

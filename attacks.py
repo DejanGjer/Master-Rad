@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple
 import inspect
 import itertools
+import importlib.util
+import sys
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -14,6 +17,8 @@ import math
 
 from utils import normalize_images
 
+from denoised_smoothing.code.core import Smooth
+
 class Attack(ABC):
     def __init__(self, name: str, dataset_params: dict):
         self.name = name
@@ -25,8 +30,14 @@ class Attack(ABC):
         pass
 
     @abstractmethod
-    def test_attack(self, model: nn.Module, dataloader: DataLoader, denoser_model: nn.Module = None, **kwargs) -> pd.Series:
+    def test_attack(self, model: nn.Module, dataloader: DataLoader, denoser_model: nn.Module = None, 
+                    normalize_inputs: bool = True, **kwargs) -> pd.Series:
         """Test the attack on the model using the given dataloader and denoiser model if available"""
+        pass
+
+    @abstractmethod
+    def test_certified_model(self, model: nn.Module, denoiser_model: nn.Module, dataloader: DataLoader, num_classes: int, epsilons: float, sigma: float, n: int, alpha: float) -> pd.Series:
+        """Test the certified smoothed model on the given dataloader and denoiser model if available"""
         pass
 
     def metrics(self, correct: int, model: nn.Module, dataloader: DataLoader, denoiser_model: nn.Module = None, **kwargs) -> pd.DataFrame:
@@ -34,7 +45,7 @@ class Attack(ABC):
         final_acc = correct / float(len(dataloader.dataset))
         # create one row in the results dataframe
         result = pd.DataFrame({
-            'Model': [model.net_type], 
+            #'Model': [model.net_type], 
             'Denoised': ["Yes"] if denoiser_model else ["No"]
         })
         result = pd.concat([result, pd.DataFrame(kwargs, index=[0])], axis=1)
@@ -95,16 +106,20 @@ class FGSMAttack(Attack):
             org_images.extend(data)
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01):
+    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01, normalize_inputs=True):
         # rename the epsilons argument (which has to have same name as the class attribute) to epsilon
         epsilon=epsilons
-        fgsm_attack = FGSM(model, eps=epsilon)
+        if normalize_inputs:
+            fgsm_attack = FGSM(model, eps=epsilon)
+        else:
+            fgsm_attack = FGSM(model[1], eps=epsilon)  # model[0] is normalization layer, model[1] is actual classifier
         model.eval()
         correct = 0
-        print(f"Testing {model.net_type} with FGSM attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
+        print(f"Testing with FGSM attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = fgsm_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if normalize_inputs:
+                adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -113,6 +128,24 @@ class FGSMAttack(Attack):
                 if final.item() == targ.item():
                     correct += 1
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
+    
+    def test_certified_model(self, model, denoiser_model, dataloader, num_classes, epsilons, sigma, n, alpha):
+        epsilon = epsilons
+        fgsm_attack = FGSM(model[1], eps=epsilon)
+        model.eval()
+        correct = 0
+        smoothed_classifier = Smooth(nn.Sequential(denoiser_model, model), num_classes, sigma)
+        print(f"Testing model with certified smoothed classifier, denoised = {denoiser_model is not None}," +
+              f"sigma = {sigma}, n = {n}, alpha = {alpha}")
+        for images, labels in tqdm(dataloader, total=len(dataloader)):
+            adv_images = fgsm_attack(images, labels)
+            batch_size = adv_images.size(0)
+            # Process each image in the batch individually
+            for i in range(batch_size):
+                pred = smoothed_classifier.predict(adv_images[i], n, alpha, batch_size)
+                if pred == labels[i].item():
+                    correct += 1
+        return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon, sigma=sigma, n=n, alpha=alpha)
     
 class RFGSMAttack(Attack):
     def __init__(self, name, dataset_params, epsilons, alpha, steps):
@@ -136,7 +169,7 @@ class RFGSMAttack(Attack):
             org_images.extend(data)
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01):
+    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01, normalize_inputs=True):
         # rename the epsilons argument (which has to have same name as the class attribute) to epsilon
         epsilon=epsilons
         rfgsm_attack = RFGSM(model, eps=epsilon, alpha=self.alpha, steps=self.steps)
@@ -145,7 +178,8 @@ class RFGSMAttack(Attack):
         print(f"Testing {model.net_type} with RFGSM attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = rfgsm_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if normalize_inputs:
+                adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -154,6 +188,27 @@ class RFGSMAttack(Attack):
                 if final.item() == targ.item():
                     correct += 1
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
+    
+    def test_certified_model(self, model, denoiser_model, dataloader, num_classes, epsilons, sigma, n, alpha):
+        epsilon = epsilons
+        rfgsm_attack = RFGSM(model, eps=epsilon, alpha=self.alpha, steps=self.steps)
+        model.eval()
+        correct = 0
+        smoothed_classifier = Smooth(nn.Sequential(denoiser_model, model), num_classes, sigma)
+        print(f"Testing {model.net_type} with certified smoothed classifier, denoised = {denoiser_model is not None}," +
+                f"sigma = {sigma}, n = {n}, alpha = {alpha}")
+        for images, labels in tqdm(dataloader, total=len(dataloader)):
+            adv_images = rfgsm_attack(images, labels)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if denoiser_model is not None:
+                adv_images = denoiser_model(adv_images)
+            batch_size = adv_images.size(0)
+            # Process each image in the batch individually
+            for i in range(batch_size):
+                pred = smoothed_classifier.predict(adv_images[i], n, alpha, batch_size)
+                if pred == labels[i].item():
+                    correct += 1
+        return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon, sigma=sigma, n=n, alpha=alpha)
 
 class PGDAttack(Attack):
     def __init__(self, name, dataset_params, epsilons, alpha, steps):
@@ -177,7 +232,7 @@ class PGDAttack(Attack):
             org_images.extend(data)
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01):
+    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01, normalize_inputs=True):
         # rename the epsilons argument (which has to have same name as the class attribute) to epsilon
         epsilon=epsilons
         pgd_attack = PGD(model, eps=epsilon, alpha=self.alpha, steps=self.steps)
@@ -186,7 +241,8 @@ class PGDAttack(Attack):
         print(f"Testing {model.net_type} with PGD attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = pgd_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if normalize_inputs:
+                adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -195,6 +251,27 @@ class PGDAttack(Attack):
                 if final.item() == targ.item():
                     correct += 1
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
+    
+    def test_certified_model(self, model, denoiser_model, dataloader, num_classes, epsilons, sigma, n, alpha):
+        epsilon = epsilons
+        pgd_attack = PGD(model, eps=epsilon, alpha=self.alpha, steps=self.steps)
+        model.eval()
+        correct = 0
+        smoothed_classifier = Smooth(nn.Sequential(denoiser_model, model), num_classes, sigma)
+        print(f"Testing {model.net_type} with certified smoothed classifier, denoised = {denoiser_model is not None}," +
+                f"sigma = {sigma}, n = {n}, alpha = {alpha}")
+        for images, labels in tqdm(dataloader, total=len(dataloader)):
+            adv_images = pgd_attack(images, labels)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if denoiser_model is not None:
+                adv_images = denoiser_model(adv_images)
+            batch_size = adv_images.size(0)
+            # Process each image in the batch individually
+            for i in range(batch_size):
+                pred = smoothed_classifier.predict(adv_images[i], n, alpha, batch_size)
+                if pred == labels[i].item():
+                    correct += 1
+        return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon, sigma=sigma, n=n, alpha=alpha)
     
 class OnePixelAttack(Attack):
     def __init__(self, name, dataset_params, pixel_counts, steps, popsize, batch_size):
@@ -219,7 +296,7 @@ class OnePixelAttack(Attack):
             org_images.extend(data)
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None, pixel_counts=1):
+    def test_attack(self, model, dataloader, denoiser_model=None, pixel_counts=1, normalize_inputs=True):
         # rename the pixel_counts argument (which has to have same name as the class attribute) to pixel_count
         pixel_count = pixel_counts
         one_pixel_attack = OnePixel(model, pixels=pixel_count, steps=self.steps, popsize=self.popsize, inf_batch=self.batch_size)
@@ -228,7 +305,8 @@ class OnePixelAttack(Attack):
         print(f"Testing {model.net_type} with OnePixel attack with pixel count = {pixel_count}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = one_pixel_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if normalize_inputs:
+                adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -237,6 +315,9 @@ class OnePixelAttack(Attack):
                 if final.item() == targ.item():
                     correct += 1
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, pixel_count=pixel_count)
+    
+    def test_certified_model(self, model, denoiser_model, dataloader, num_classes, epsilons, sigma, n, alpha):
+        raise NotImplementedError("OnePixel attack does not support certified model testing")
     
 class PixleAttack(Attack):
     def __init__(self, name, dataset_params, x_dimensions, y_dimensions, pixel_mapping, 
@@ -263,7 +344,7 @@ class PixleAttack(Attack):
             org_images.extend(data)
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None):
+    def test_attack(self, model, dataloader, denoiser_model=None, normalize_inputs=True):
         pixle_attack = Pixle(model, x_dimensions=self.x_dimensions, y_dimensions=self.y_dimensions, 
                              pixel_mapping=self.pixel_mapping, restarts=self.restarts, max_iterations=self.max_iterations, 
                              update_each_iteration=self.update_each_iteration)
@@ -272,7 +353,8 @@ class PixleAttack(Attack):
         print(f"Testing {model.net_type} with Pixle attack, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = pixle_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if normalize_inputs:
+                adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -281,6 +363,9 @@ class PixleAttack(Attack):
                 if final.item() == targ.item():
                     correct += 1
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model)
+    
+    def test_certified_model(self, model, denoiser_model, dataloader, num_classes, epsilons, sigma, n, alpha):
+        raise NotImplementedError("Pixle attack does not support certified model testing")
     
 class SquareAttack(Attack):
     def __init__(self, name, dataset_params, norm, epsilons, n_queries, n_restarts, p_init, loss, resc_schedule, seed):
@@ -310,7 +395,7 @@ class SquareAttack(Attack):
             org_images.extend(data)
         return adv_images, org_images
     
-    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01):
+    def test_attack(self, model, dataloader, denoiser_model=None, epsilons=0.01, normalize_inputs=True):
         # rename the epsilons argument (which has to have same name as the class attribute) to epsilon
         epsilon=epsilons
         square_attack = Square(model, norm=self.norm, eps=epsilon, n_queries=self.n_queries, n_restarts=self.n_restarts, 
@@ -320,7 +405,8 @@ class SquareAttack(Attack):
         print(f"Testing {model.net_type} with Square attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = square_attack(images, labels)
-            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if normalize_inputs:
+                adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
             if denoiser_model is not None:
                 adv_images = denoiser_model(adv_images)
             outputs = model(adv_images)
@@ -329,4 +415,26 @@ class SquareAttack(Attack):
                 if final.item() == targ.item():
                     correct += 1
         return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon)
+    
+    def test_certified_model(self, model, denoiser_model, dataloader, num_classes, epsilons, sigma, n, alpha):
+        epsilon = epsilons
+        square_attack = Square(model, norm=self.norm, eps=epsilon, n_queries=self.n_queries, n_restarts=self.n_restarts, 
+                               p_init=self.p_init, loss=self.loss, resc_schedule=self.resc_schedule, seed=self.seed)
+        model.eval()
+        correct = 0
+        smoothed_classifier = Smooth(nn.Sequential(denoiser_model, model), num_classes, sigma)
+        print(f"Testing {model.net_type} with certified smoothed classifier, denoised = {denoiser_model is not None}," +
+                f"sigma = {sigma}, n = {n}, alpha = {alpha}")
+        for images, labels in tqdm(dataloader, total=len(dataloader)):
+            adv_images = square_attack(images, labels)
+            adv_images = normalize_images(adv_images, mean=self.dataset_params["mean"], std=self.dataset_params["std"])
+            if denoiser_model is not None:
+                adv_images = denoiser_model(adv_images)
+            batch_size = adv_images.size(0)
+            # Process each image in the batch individually
+            for i in range(batch_size):
+                pred = smoothed_classifier.predict(adv_images[i], n, alpha, batch_size)
+                if pred == labels[i].item():
+                    correct += 1
+        return self.metrics(correct, model, dataloader, denoiser_model=denoiser_model, epsilon=epsilon, sigma=sigma, n=n, alpha=alpha)
 

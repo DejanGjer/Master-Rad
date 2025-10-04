@@ -6,6 +6,8 @@ import torch
 import os
 import shutil
 
+from denoised_smoothing.code.datasets import get_normalize_layer
+
 def normalize_images(images: torch.Tensor, mean: List[float], std: List[float]) -> torch.Tensor:
     assert torch.max(images) <= 1.0 and torch.min(images) >= 0.0, "Images are not in range [0, 1]"
     assert len(mean) == len(std), f"Mean and std must have same length, got {len(mean)} and {len(std)}"
@@ -16,12 +18,20 @@ def normalize_images(images: torch.Tensor, mean: List[float], std: List[float]) 
     std = torch.tensor(std).view(1, num_channels, 1, 1).to(device)
     return (images - mean) / std
 
-def load_model(path, device):
+def load_model(path, device, denoised_smoothing_run=False, dataset_name=None):
     model = None
     if device == torch.device('cuda'):
         model = torch.load(path, weights_only=False)
     else:
         model = torch.load(path, map_location=torch.device('cpu'), weights_only=False)
+
+    if denoised_smoothing_run:
+        # we have to add normalization layer at the start of the model
+        model = torch.nn.Sequential(
+            get_normalize_layer(dataset_name),
+            model
+        )
+        print("Added normalization layer to the model for denoised smoothing run")
     return model
 
 def save_model(model, path):
