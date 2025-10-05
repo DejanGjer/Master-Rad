@@ -45,7 +45,7 @@ class Attack(ABC):
         final_acc = correct / float(len(dataloader.dataset))
         # create one row in the results dataframe
         result = pd.DataFrame({
-            #'Model': [model.net_type], 
+            'Model': [model.net_type if not isinstance(model, torch.nn.Sequential) else model[1].net_type], 
             'Denoised': ["Yes"] if denoiser_model else ["No"]
         })
         result = pd.concat([result, pd.DataFrame(kwargs, index=[0])], axis=1)
@@ -115,7 +115,8 @@ class FGSMAttack(Attack):
             fgsm_attack = FGSM(model[1], eps=epsilon)  # model[0] is normalization layer, model[1] is actual classifier
         model.eval()
         correct = 0
-        print(f"Testing with FGSM attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
+        print(f"Testing {model.net_type if not isinstance(model, torch.nn.Sequential) else model[1].net_type}"
+              + f" with FGSM attack with epsilon = {epsilon}, denoised = {denoiser_model is not None}")
         for images, labels in tqdm(dataloader, total=len(dataloader)):
             adv_images = fgsm_attack(images, labels)
             if normalize_inputs:

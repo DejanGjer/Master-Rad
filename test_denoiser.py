@@ -144,9 +144,10 @@ if __name__ == "__main__":
     # Loading classfier models needed for testing
     test_models = []
     for model_path in config.test_model_paths:
-        test_models.append(load_model(model_path, device, denoised_smoothing_run=config.denoised_smoothing_run,
-                                      dataset_name=config.dataset_name))
-        # print(f"Loaded model {test_models[-1].net_type}") 
+        curr_model = load_model(model_path, device, denoised_smoothing_run=config.denoised_smoothing_run,
+                                      dataset_name=config.dataset_name)
+        test_models.append(curr_model)
+        print(f"Loaded model {curr_model[1].net_type if isinstance(curr_model, torch.nn.Sequential) else curr_model.net_type}") 
         test_models[-1].eval()
 
     save_dir = create_save_directories(config.save_root_path)
@@ -176,11 +177,13 @@ if __name__ == "__main__":
 
         total_average_improvement += total_model_improvement / len(attack)
         averaged_results_temp = pd.DataFrame({ 
+                                    'Model': [attacked_model.net_type if not isinstance(attacked_model, torch.nn.Sequential) else attacked_model[1].net_type], 
                                     'Average Improvement': [total_model_improvement / len(attack)]
                                 })
         averaged_results = pd.concat([averaged_results, averaged_results_temp], ignore_index=True) \
                            if averaged_results is not None else averaged_results_temp
-        print(f"Average improvement for denoised model: {100 * total_model_improvement / len(attack)}%")
+        print(f"Average improvement for {attacked_model.net_type if not isinstance(attacked_model, torch.nn.Sequential) else attacked_model[1].net_type}" +
+               f" model: {100 * total_model_improvement / len(attack)}%")
     print(f"Average improvement for all models: {100 * total_average_improvement / (len(test_models))}%")
     # save results dataframes
     results.to_csv(os.path.join(save_dir, 'results.csv'), index=False)
