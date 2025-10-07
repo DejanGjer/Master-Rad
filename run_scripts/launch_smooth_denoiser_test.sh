@@ -5,11 +5,11 @@ attack_type="fgsm"                # Attack type to test against
 use_randomized_smoothing=True    # Whether to use randomized smoothing
 n=500                           # Number of samples for smoothing
 alpha=0.001                      # Smoothing parameter
-sigma=0.5                      # Noise level for smoothing
+sigma=0.3                      # Noise level for smoothing
 denoiser_arch="cifar_dncnn"           # Architecture of the denoiser
 classifier_path="/home/dgjer/master/Master-Rad/base_training_checkpoints/sweep_2025-07-06_01-56-46/2025-07-06_01-56-46/checkpoints/model_normal.pth"  # Path to classifier model
-denoiser_path="/home/dgjer/master/Master-Rad/denoised_smoothing_results/stability_obj/cifar10_dncnn_stability_0_500/best.pth.tar"  # Path to trained denoiser
-save_root_path="../denoised_smoothing_results/tests/stability_obj"  # Root path for saving results
+denoiser_path="/home/dgjer/master/Master-Rad/denoised_smoothing_results/stability_obj/cifar10_dncnn_denoising_0_300/best.pth.tar"  # Path to trained denoiser
+save_root_path="../denoised_smoothing_results/tests/denoising_obj"  # Root path for saving results
 
 # Create timestamped directory
 timestamp=$(date +"%Y-%m-%d_%H-%M-%S")

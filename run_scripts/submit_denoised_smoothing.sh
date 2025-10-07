@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Define training parameters
-noise=0.05
-epochs=100
-objective="stability"
+noise=0.45
+epochs=50
+objective="denoising"
 
 # Define computational resources
-node="n20"  # Specify the node to run on
+node="n16"  # Specify the node to run on
 
 # Format noise value for directory name (e.g., 0.3 -> 0_30)
 noise_str=$(printf "%.2f" $noise | sed 's/\./_/')0
