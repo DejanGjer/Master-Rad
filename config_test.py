@@ -7,7 +7,7 @@ seed = 42
 attack_type = 'fgsm'
 attack_params = {
     "fgsm": {
-        "epsilons": [0, 0.01, 0.02, 0.03, 0.04, 0.05]
+        "epsilons": [0.01, 0.03, 0.05]
     },
     "rfgsm": {
         "epsilons": [0.01, 0.02, 0.03, 0.04, 0.05],

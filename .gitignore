@@ -65,6 +65,7 @@ __pycache__/
 base_training_checkpoints/
 hgd_training_results/
 synergy_defenses_results/
+denoised_smoothing_results/
 checkpoints/
 original_models/
 *.pt
